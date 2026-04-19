@@ -2,5 +2,5 @@
 .DS_Store
 Thumbs.db
 node_modules/
-src/home.js
-src/gen.js
+**/src/home.js
+**/src/gen.js
