@@ -18,8 +18,8 @@ function execute(url) {
     browser.launchAsync(url);
 
     let doc;
-    for (let i = 0; i < 50; i++) {
-        sleep(200); // Check every 0.2s for faster response
+    for (let i = 0; i < 30; i++) {
+        sleep(250); // 0.25s sleep, max 7.5s. Balance between speed and stability.
         doc = browser.html();
         if (doc) {
             let title = doc.select("title").text() + "";
@@ -45,11 +45,9 @@ function execute(url) {
 
         // --- FIND BOOK TITLE FOR FILTERING ---
         let bookTitle = "";
-        // Try to find in the old Back button
         let titleElement = doc.select("ul.last9 li.title a.back").first();
-        // Try to find in breadcrumb or page title
         if (!titleElement) {
-            let pageTitle = doc.select("title").text() + ""; // Ex: 《Novel A》 Chapter 1...
+            let pageTitle = doc.select("title").text() + "";
             let match = pageTitle.match(/《(.*?)》/);
             if (match && match[1]) bookTitle = match[1];
         } else {
@@ -63,7 +61,7 @@ function execute(url) {
         for (let i = 0; i < listItems.size(); i++) {
             let li = listItems.get(i);
 
-            // 1. Check title class (Use attr to avoid hasClass error)
+            // 1. Check title class
             let className = li.attr("class") + "";
             if (className && className.indexOf("title") !== -1) {
                 continue;
@@ -73,25 +71,21 @@ function execute(url) {
             let link = "";
             let isProtected = false;
 
-            // STEP 1: Find Hidden Link (Protected) - Logic for RAW HTML
-            // In raw HTML, it is usually a span tag, not an 'a' tag
+            // Use .select() because getElementsByClass threw an error in Rhino
             let protectedItem = li.select(".protected-chapter-link").first();
 
-            // Fallback: Find any tag with data-cid-url
+            // CSS selector fallback only if necessary
             if (!protectedItem) {
                 protectedItem = li.select("[data-cid-url]").first();
             }
 
             if (protectedItem) {
                 link = protectedItem.attr("data-cid-url") + "";
-                // Prioritize displayed text
                 name = protectedItem.text() + "";
-                // If text is empty (hidden by CSS), get data-title
                 if (!name) name = protectedItem.attr("data-title") + "";
                 isProtected = true;
             }
 
-            // STEP 2: Find normal <a> tag (If step 1 yields no results)
             if (!link || link.length === 0) {
                 let a = li.select("a").first();
                 if (a) {
@@ -100,13 +94,11 @@ function execute(url) {
                 }
             }
 
-            // --- FINAL DATA PROCESSING ---
             if (link && link.length > 0) {
                 if (link.startsWith("/")) {
                     link = HOST + link;
                 }
 
-                // Clean Name: Remove book title
                 if (name) {
                     if (bookTitle && name.indexOf(bookTitle) !== -1) {
                         name = name.replace(bookTitle, "").trim();

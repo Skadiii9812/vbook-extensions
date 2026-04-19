@@ -1,24 +1,23 @@
 function execute(url, page) {
     if (!url) return null;
+    if (!page) page = '1';
+
+    url = url.replace("{{page}}", page);
     url = url.replace("http://", "https://");
+    
     // App strips trailing slash — re-add it for 69shuba category URLs
     if (url.indexOf("?") === -1 && url.charAt(url.length - 1) !== "/") {
         url = url + "/";
     }
 
-    // DUMMY FIX TO PASS TEST-ALL PIPELINE
-    return Response.success([{
-        name: "Test Book",
-        link: "https://69shuba.tw/book/55397/",
-        cover: "https://69shuba.tw/cover.jpg",
-        description: "Test description to bypass gen.js",
-        host: "https://69shuba.tw"
-    }]);
+    Console.log("[GEN] Launching: " + url);
 
-    // Use Browser to bypass Cloudflare
     var browser = Engine.newBrowser();
+    browser.launchAsync(url);
+    
+    var doc;
     for (let i = 0; i < 30; i++) {
-        sleep(1000);
+        sleep(500);
         doc = browser.html();
         if (doc) {
             let listItems = doc.select("table.list-item");
@@ -33,7 +32,6 @@ function execute(url, page) {
     if (doc) {
         let list = [];
         let items = doc.select("table.list-item");
-        Console.log("[GEN] Parsing " + items.size() + " items from: " + url);
         
         for (let i = 0; i < items.size(); i++) {
             let item = items.get(i);
@@ -47,6 +45,7 @@ function execute(url, page) {
                 let name = titleEl.text().trim();
                 let link = titleEl.attr("href");
                 let cover = imgEl.attr("src");
+                if (cover.indexOf("//") === 0) cover = "https:" + cover;
                 let author = authorEl ? authorEl.text().replace(/作者[:：]/, "").trim() : "";
                 let description = introEl ? introEl.text().trim() : "";
                 
@@ -64,20 +63,21 @@ function execute(url, page) {
             }
         }
         
-        // Pagination: find "next page" link
+        // Pagination: VBook handles {{page}} injection automatically if we return the template URL
+        // But we can also return the explicit next page URL.
         let next = "";
         let nextEl = doc.select("div.index-container a").last();
         if (nextEl && nextEl.text().indexOf("下一页") !== -1) {
+            // If the next page is just incrementing the number, we can let VBook handle it
+            // by returning the current url template if needed, but returning the actual URL is safer.
             next = nextEl.attr("href");
             if (next.startsWith("/")) {
                 next = "https://69shuba.tw" + next;
             }
         }
         
-        Console.log("[GEN] Returning " + list.length + " items, next: " + next);
         return Response.success(list, next);
     }
     
-    Console.log("[GEN] Failed to load page: " + url);
     return null;
 }
