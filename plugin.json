@@ -1,0 +1,19 @@
+{
+    "metadata": {
+        "author": "Skadi",
+        "description": "VBook extensions"
+    },
+    "data": [
+        {
+            "name": "69shuba_tw",
+            "author": "Skadi",
+            "path": "https://raw.githubusercontent.com/Skadiii9812/vbook-extensions/main/extensions/69shuba_tw/plugin.zip",
+            "version": 1,
+            "source": "https://69shuba.tw",
+            "icon": "https://raw.githubusercontent.com/Skadiii9812/vbook-extensions/main/extensions/69shuba_tw/icon.png",
+            "description": "69shuba.tw",
+            "type": "chinese_novel",
+            "locale": "zh_CN"
+        }
+    ]
+}

@@ -1,0 +1,19 @@
+{
+    "metadata": {
+        "name": "69shuba_tw",
+        "author": "Skadi",
+        "version": 1,
+        "source": "https://69shuba.tw",
+        "regexp": "(www\\.)?69shuba\\.tw/book/\\d+/?$",
+        "description": "69shuba_tw",
+        "locale": "zh_CN",
+        "language": "javascript",
+        "type": "chinese_novel"
+    },
+    "script": {
+        "detail": "detail.js",
+        "page": "page.js",
+        "toc": "toc.js",
+        "chap": "chap.js"
+    }
+}
