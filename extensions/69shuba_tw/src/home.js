@@ -1,5 +1,6 @@
 function execute() {
     return Response.success([
+        { title: "精選推薦", input: "https://69shuba.tw/", script: "featured.js" },
         { title: "玄幻魔法", input: "https://69shuba.tw/fenlei/xuanhuan/{{page}}/", script: "gen.js" },
         { title: "武俠修真", input: "https://69shuba.tw/fenlei/wuxia/{{page}}/", script: "gen.js" },
         { title: "都市小說", input: "https://69shuba.tw/fenlei/dushi/{{page}}/", script: "gen.js" },
