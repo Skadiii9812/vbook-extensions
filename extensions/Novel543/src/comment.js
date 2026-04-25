@@ -11,14 +11,14 @@ function execute(bookId, page) {
     var commentEls = doc.select(".comment-list li, .comments .comment, #comments .item, .review-list li");
     for (var i = 0; i < commentEls.size(); i++) {
         var el = commentEls.get(i);
-        var content = el.text().trim();
+        var content = el.text().trim() + "";
         if (!content || content.length < 5) continue;
 
         var userEl = selFirst(el, ".user, .username, .nickname, strong");
-        var username = userEl ? userEl.text().trim() : "\u8b80\u8005";
+        var username = userEl ? userEl.text().trim() + "" : "\u8b80\u8005";
 
         var dateEl = selFirst(el, ".date, .time, time");
-        var date = dateEl ? dateEl.text().trim() : "";
+        var date = dateEl ? dateEl.text().trim() + "" : "";
 
         if (username && content.indexOf(username) === 0) content = content.substring(username.length).trim();
 

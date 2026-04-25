@@ -63,24 +63,24 @@ function execute(url) {
             var li = recItems.get(ri);
             var link = selFirst(li, "h3 a, a[href]");
             if (!link) continue;
-            var href = link.attr("href") || "";
+            var href = link.attr("href") + "" || "";
             var bookMatch = href.match(/\/(\d{10,})\//);
             if (!bookMatch || seen[bookMatch[1]]) continue;
             seen[bookMatch[1]] = true;
 
             var name = "";
             var titleEl = selFirst(li, "h3 a");
-            if (titleEl) name = titleEl.text().trim();
+            if (titleEl) name = titleEl.text().trim() + "";
             if (!name) {
                 var imgElAlt = selFirst(li, "img");
-                if (imgElAlt) name = imgElAlt.attr("alt") || "";
+                if (imgElAlt) name = imgElAlt.attr("alt") + "" || "";
             }
             if (!name || name.length < 2) continue;
 
             var imgEl = selFirst(li, "img");
-            var cover = imgEl ? (imgEl.attr("src") || "") : "";
+            var cover = imgEl ? (imgEl.attr("src") + "" || "") : "";
             var authEl = selFirst(li, ".author, p.author");
-            var author = authEl ? authEl.text().trim() : "";
+            var author = authEl ? authEl.text().trim() + "" : "";
 
             result.push({
                 name: name,
@@ -102,7 +102,7 @@ function execute(url) {
             if (!bm || seen[bm[1]]) continue;
             seen[bm[1]] = true;
 
-            var name2 = a.text().trim();
+            var name2 = a.text().trim() + "";
             if (!name2 || name2.length < 2 || name2.length > 100) continue;
             if (name2.indexOf("\u67e5\u770b") === 0) continue;
 

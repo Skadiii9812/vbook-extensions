@@ -16,13 +16,13 @@ function execute(url) {
         var chapLinks = doc.select("a[href]");
         for (var i = 0; i < chapLinks.size(); i++) {
             var a = chapLinks.get(i);
-            var href = a.attr("href") || "";
+            var href = a.attr("href") + "" || "";
             if (href.indexOf("/" + bookId + "/") < 0 || href.indexOf(".html") < 0) continue;
             if (href.indexOf("/dir") >= 0) continue;
             if (href.indexOf("http") !== 0) href = BASE_URL + href;
             if (seen[href]) continue;
 
-            var chapName = a.text().trim();
+            var chapName = a.text().trim() + "";
             if (!chapName || chapName.length < 2) continue;
             if (chapName === "\u4e0a\u4e00\u7ae0" || chapName === "\u4e0b\u4e00\u7ae0" ||
                 chapName === "\u76ee\u9304") continue;
@@ -39,13 +39,13 @@ function execute(url) {
             var links2 = detailDoc.select(".chaplist a[href], a[href*='" + bookId + "'][href$='.html']");
             for (var j = 0; j < links2.size(); j++) {
                 var a2 = links2.get(j);
-                var h2 = a2.attr("href") || "";
+                var h2 = a2.attr("href") + "" || "";
                 if (h2.indexOf("/" + bookId + "/") < 0 || h2.indexOf(".html") < 0) continue;
                 if (h2.indexOf("/dir") >= 0) continue;
                 if (h2.indexOf("http") !== 0) h2 = BASE_URL + h2;
                 if (seen[h2]) continue;
 
-                var cn2 = a2.attr("title") || a2.text().trim();
+                var cn2 = a2.attr("title") + "" || a2.text().trim() + "";
                 if (!cn2 || cn2.length < 2) continue;
                 cn2 = cn2.replace(/^[^\s]+ /, "");
 

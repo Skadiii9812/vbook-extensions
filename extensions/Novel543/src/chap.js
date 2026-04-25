@@ -15,7 +15,7 @@ function execute(url) {
     // Remove "溫馨提示" and VIP blocks by finding their containers
     el.select("div:has(span:contains(溫馨提示)), div:has(p:contains(溫馨提示)), div:has(button:contains(點擊查看))").remove();
 
-    var html = el.html();
+    var html = el.html() + "";
     if (!html || html.trim().length < 50) return Response.error("Nội dung chương trống");
 
     // Final regex cleanup for any remaining ad text
@@ -57,7 +57,7 @@ function execute(url) {
             el2.select("script, style, ins, iframe, .gadBlock, .adBlock, [data-ad], a, img").remove();
             el2.select("div:has(span:contains(溫馨提示)), div:has(p:contains(溫馨提示)), div:has(button:contains(點擊查看))").remove();
 
-            var html2 = el2.html();
+            var html2 = el2.html() + "";
             if (!html2 || html2.trim().length < 50) continue;
 
             html2 = html2.replace(/溫馨提示[\s\S]*?(加入書架|等功能)/g, "");

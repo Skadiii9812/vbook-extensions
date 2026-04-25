@@ -203,18 +203,18 @@ function parseList(doc) {
         var item = mediaItems.get(i);
         var titleLink = selFirst(item, ".media-content h3 a");
         if (!titleLink) continue;
-        var href = titleLink.attr("href") || "";
+        var href = titleLink.attr("href") + "" || "";
         if (!href || seen[href]) continue;
-        var name = titleLink.text().trim();
+        var name = titleLink.text().trim() + "";
         if (!name || name.length < 2) continue;
         seen[href] = true;
 
         var imgEl = selFirst(item, ".media-left img");
-        var cover = imgEl ? (imgEl.attr("src") || imgEl.attr("data-src") || "") : "";
+        var cover = imgEl ? (imgEl.attr("src") + "" || imgEl.attr("data-src") + "" || "") : "";
         var descEl = selFirst(item, "p.desc");
-        var desc = descEl ? descEl.text().trim() : "";
+        var desc = descEl ? descEl.text().trim() + "" : "";
         var authEl = selFirst(item, "span.author");
-        var author = authEl ? authEl.text().trim() : "";
+        var author = authEl ? authEl.text().trim() + "" : "";
 
         result.push({
             name: name, link: resolveUrl(href), host: HOST, cover: cover,
@@ -229,17 +229,17 @@ function parseList(doc) {
             if (li.attr("class") && li.attr("class").indexOf("media") >= 0) continue;
             var link = selFirst(li, "h3 a");
             if (!link) continue;
-            var h2 = link.attr("href") || "";
+            var h2 = link.attr("href") + "" || "";
             if (!h2 || seen[h2]) continue;
-            var n2 = link.text().trim();
+            var n2 = link.text().trim() + "";
             if (!n2 || n2.length < 2) continue;
             seen[h2] = true;
             var im2 = selFirst(li, "img");
             var au2 = selFirst(li, ".author, p.author");
             result.push({
                 name: n2, link: resolveUrl(h2), host: HOST,
-                cover: im2 ? (im2.attr("src") || "") : "",
-                description: au2 ? au2.text().trim() : ""
+                cover: im2 ? (im2.attr("src") + "" || "") : "",
+                description: au2 ? au2.text().trim() + "" : ""
             });
         }
     }
@@ -250,16 +250,16 @@ function parseList(doc) {
             var nli = newsItems.get(k);
             var nl = selFirst(nli, "h3 a");
             if (!nl) continue;
-            var nh = nl.attr("href") || "";
+            var nh = nl.attr("href") + "" || "";
             if (!nh || seen[nh]) continue;
-            var nn = nl.text().trim();
+            var nn = nl.text().trim() + "";
             if (!nn || nn.length < 2) continue;
             seen[nh] = true;
             var ce = selFirst(nli, "span.cat");
             var na = selFirst(nli, "span.author");
             result.push({
                 name: nn, link: resolveUrl(nh), host: HOST, cover: "",
-                description: (ce ? ce.text().trim() + " " : "") + (na ? na.text().trim() : "")
+                description: (ce ? ce.text().trim() + " " : "") + (na ? na.text().trim() + "" : "")
             });
         }
     }
@@ -283,5 +283,5 @@ function stripHtml(html) {
         .replace(/<[^>]*>/g, "")
         .replace(/&nbsp;/gi, " ").replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-        .replace(/[ \t\r]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+        .replace(/[ \t\r]+/g, " ").replace(/\n{3,}/g, "\n\n").trim() + "";
 }

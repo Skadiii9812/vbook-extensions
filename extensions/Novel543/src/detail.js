@@ -16,11 +16,11 @@ function execute(url) {
 
     // --- Name from h1.title ---
     var nameEl = selFirst(doc, "h1.title, h1, .title h1");
-    var name = nameEl ? nameEl.text().trim() : "";
+    var name = nameEl ? nameEl.text().trim() + "" : "";
     if (!name) {
         var titleTag = selFirst(doc, "title");
         if (titleTag) {
-            name = titleTag.text().trim().replace(/\s*[-_|].*$/, "").trim();
+            name = titleTag.text().trim().replace(/\s*[-_|].*$/, "").trim() + "";
         }
     }
 
@@ -28,23 +28,23 @@ function execute(url) {
     var cover = "";
     var picEl = selFirst(doc, "#detail .cover img, .media-left img, .bookimg img");
     if (picEl) {
-        cover = picEl.attr("src") || picEl.attr("data-src") || "";
+        cover = (picEl.attr("src") + "" || picEl.attr("data-src") + "" || "");
     }
     if (!cover) {
         var metaOg = selFirst(doc, "meta[property='og:image']");
-        if (metaOg) cover = metaOg.attr("content") || "";
+        if (metaOg) cover = metaOg.attr("content") + "" || "";
     }
 
     // --- Author from span.author or "作者：" pattern ---
     var author = "";
     var authorEl = selFirst(doc, ".meta span.author, .info span.author, span.author");
     if (authorEl) {
-        author = authorEl.text().trim();
+        author = authorEl.text().trim() + "";
     }
     if (!author) {
         var metaEls = doc.select(".meta p, .meta span, .info p");
         for (var ai = 0; ai < metaEls.size(); ai++) {
-            var atxt = metaEls.get(ai).text().trim();
+            var atxt = metaEls.get(ai).text().trim() + "";
             var am = atxt.match(/\u4f5c\u8005[\uff1a:]\s*(.+)/);  // 作者：
             if (am && am[1] && am[1].length < 50) {
                 author = am[1].trim();
@@ -55,11 +55,11 @@ function execute(url) {
 
     // --- Description from .intro ---
     var descEl = selFirst(doc, ".intro, #intro, .desc, .summary");
-    var description = descEl ? stripHtml(descEl.html()) : "";
+    var description = descEl ? stripHtml(descEl.html() + "") : "";
 
     // --- Status: 完結/連載 ---
     var ongoing = true;
-    var bodyText = doc.text();
+    var bodyText = doc.text() + "";
     if (bodyText.indexOf("\u5b8c\u7d50") !== -1 || bodyText.indexOf("\u5168\u672c") !== -1) {  // 完結, 全本
         ongoing = false;
     }
@@ -68,7 +68,7 @@ function execute(url) {
     var genres = [];
     var catLink = selFirst(doc, "a[href*='/bookstack/']");
     if (catLink) {
-        var catHref = catLink.attr("href") || "";
+        var catHref = catLink.attr("href") + "" || "";
         var catMatch = catHref.match(/\/bookstack\/([a-z]+)\//);
         if (catMatch && GENRE_MAP[catMatch[1]]) {
             genres.push({
@@ -81,7 +81,7 @@ function execute(url) {
     // Also scan for category in .meta
     var catEl = selFirst(doc, ".meta a[href*='bookstack']");
     if (catEl && genres.length === 0) {
-        var catText = catEl.text().trim();
+        var catText = catEl.text().trim() + "";
         if (catText) {
             genres.push({
                 title: catText,
@@ -102,7 +102,7 @@ function execute(url) {
     // Same author search
     if (author) {
         suggests.push({
-            title: "\u540c\u4f5c\u8005: " + author,  // 同作者
+            title: "\u540c\u4f5c\u8005: " + (author + ""),  // 同作者
             input: "author:" + author,
             script: "suggest.js"
         });
