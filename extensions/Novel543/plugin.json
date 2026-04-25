@@ -5,7 +5,7 @@
     "version": 1,
     "source": "https://www.novel543.com",
     "regexp": "(www\\.)?novel543\\.com\\/\\d{4,}\\d+\\/?$",
-    "description": "稷下書院 - Truyện chữ Tiếng Trung online",
+    "description": "Novel543",
     "locale": "zh_TW",
     "type": "chinese_novel"
   },

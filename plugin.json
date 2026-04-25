@@ -14,6 +14,17 @@
             "description": "69shuba.tw",
             "type": "chinese_novel",
             "locale": "zh_CN"
+        },
+        {
+            "name": "Novel543",
+            "author": "Skadi",
+            "path": "https://raw.githubusercontent.com/Skadiii9812/vbook-extensions/main/extensions/Novel543/plugin.zip",
+            "version": 1,
+            "source": "https://www.novel543.com",
+            "icon": "https://raw.githubusercontent.com/Skadiii9812/vbook-extensions/main/extensions/Novel543/icon.png",
+            "description": "Novel543",
+            "type": "chinese_novel",
+            "locale": "zh_TW"
         }
     ]
 }
