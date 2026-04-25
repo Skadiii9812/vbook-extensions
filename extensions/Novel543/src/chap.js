@@ -5,7 +5,7 @@ function execute(url) {
     // Use light fetch — blocks all images/CSS/fonts for max speed
     var doc = fetchCFLight(chapUrl);
     if (!doc) return Response.error("Lỗi tải nội dung chương");
-    Console.log("[CHAP] Fetched page 1: " + chapUrl);
+    // Console.log("[CHAP] Fetched page 1: " + chapUrl);
 
     var el = selFirst(doc, ".chapter-content .content, .content, #BookText, #content");
     if (!el) return Response.error("Không tìm thấy nội dung chương");
@@ -34,7 +34,7 @@ function execute(url) {
             totalPages = parseInt(pageMatch[2]);
         }
     }
-    Console.log("[CHAP] Detected page " + currentPage + " of " + totalPages);
+    // Console.log("[CHAP] Detected page " + currentPage + " of " + totalPages);
 
     // Only merge if we are on page 1
     if (currentPage === 1 && totalPages > 1) {
@@ -46,10 +46,10 @@ function execute(url) {
 
             var doc2 = fetchCFLight(nextUrl);
             if (!doc2) {
-                Console.log("[CHAP] Failed to fetch page " + p + ": " + nextUrl);
+                // Console.log("[CHAP] Failed to fetch page " + p + ": " + nextUrl);
                 continue;
             }
-            Console.log("[CHAP] Fetched page " + p + ": " + nextUrl);
+            // Console.log("[CHAP] Fetched page " + p + ": " + nextUrl);
 
             var el2 = selFirst(doc2, ".chapter-content .content, .content, #BookText, #content");
             if (!el2) continue;

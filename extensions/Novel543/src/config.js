@@ -97,7 +97,7 @@ function warmupCF() {
         return true;
     }
 
-    Console.log("[novel543] Warming up Cloudflare bypass...");
+    // Console.log("[novel543] Warming up Cloudflare bypass...");
     var browser = Engine.newBrowser();
     browser.setUserAgent(UserAgent.android());
     browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
@@ -115,7 +115,7 @@ function warmupCF() {
     browser.close();
 
     _cfReady = !!loadCookie();
-    if (_cfReady) Console.log("[novel543] CF bypass OK, cookies cached!");
+    if (_cfReady) // Console.log("[novel543] CF bypass OK, cookies cached!");
     return _cfReady;
 }
 
