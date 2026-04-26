@@ -3,7 +3,7 @@ load("config.js");
 function execute(url) {
     var storyUrl = resolveUrl(url);
     var bookIdMatch = storyUrl.match(/\/(\d{10,})\/?$/);
-    if (!bookIdMatch) return Response.error("URL không hợp lệ");
+    if (!bookIdMatch) return Response.error("Invalid URL");
     var bookId = bookIdMatch[1];
     var dirUrl = BASE_URL + "/" + bookId + "/dir";
 
@@ -70,6 +70,6 @@ function execute(url) {
         }
     }
 
-    if (chapters.length === 0) return Response.error("Không tìm thấy danh sách chương");
+    if (chapters.length === 0) return Response.error("Chapter list not found");
     return Response.success(chapters);
 }

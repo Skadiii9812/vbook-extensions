@@ -12,7 +12,7 @@ var GENRE_MAP = {
 function execute(url) {
     var storyUrl = resolveUrl(url);
     var doc = fetchCF(storyUrl);
-    if (!doc) return Response.error("Lỗi tải trang truyện");
+    if (!doc) return Response.error("Story page load error");
 
     // --- Name from h1.title ---
     var nameEl = selFirst(doc, "h1.title, h1, .title h1");

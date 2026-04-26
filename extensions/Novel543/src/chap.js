@@ -4,11 +4,11 @@ function execute(url) {
     var chapUrl = resolveUrl(url);
     // Use light fetch — blocks all images/CSS/fonts for max speed
     var doc = fetchCFLight(chapUrl);
-    if (!doc) return Response.error("Lỗi tải nội dung chương");
+    if (!doc) return Response.error("Chapter content load error");
     // Console.log("[CHAP] Fetched page 1: " + chapUrl);
 
     var el = selFirst(doc, ".chapter-content .content, .content, #BookText, #content");
-    if (!el) return Response.error("Không tìm thấy nội dung chương");
+    if (!el) return Response.error("Chapter content not found");
 
     // Remove junk
     el.select("script, style, ins, iframe, .gadBlock, .adBlock, [data-ad], a, img").remove();
@@ -16,7 +16,7 @@ function execute(url) {
     el.select("div:has(span:contains(溫馨提示)), div:has(p:contains(溫馨提示)), div:has(button:contains(點擊查看))").remove();
 
     var html = el.html() + "";
-    if (!html || html.trim().length < 50) return Response.error("Nội dung chương trống");
+    if (!html || html.trim().length < 50) return Response.error("Chapter content is empty");
 
     // Final regex cleanup for any remaining ad text
     html = html.replace(/溫馨提示[\s\S]*?(加入書架|等功能)/g, "");

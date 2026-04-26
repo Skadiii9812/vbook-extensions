@@ -20,7 +20,7 @@ function execute(url, page) {
 
     // List pages don't need images loaded in browser
     var doc = fetchCFLight(fetchUrl);
-    if (!doc) return Response.error("Lỗi tải trang: " + fetchUrl);
+    if (!doc) return Response.error("Page load error: " + fetchUrl);
 
     var items = parseList(doc);
     if (!items || items.length === 0) return Response.success([], null);
