@@ -119,13 +119,32 @@ function execute(url) {
         });
     }
 
+    // --- Category and Update Time for display ---
+    var categoryDisplay = "";
+    var updateTime = "";
+    var metaSpans = doc.select(".meta span, .info span");
+    for (var i = 0; i < metaSpans.size(); i++) {
+        var t = metaSpans.get(i).text() + "";
+        if (t.indexOf("\u5206\u985e") >= 0) { // 分類
+            categoryDisplay = t.replace(/.*[\u5206\u985e][\uff1a:]?\s*/, "").trim();
+        }
+        if (t.indexOf("\u66f4\u65b0") >= 0) { // 更新
+            updateTime = t.replace(/.*[\u66f4\u65b0][\uff1a:]?\s*/, "").trim();
+        }
+    }
+
+    var detailHtml = [];
+    if (author) detailHtml.push("\u4f5c\u8005\uff1a" + author); // 作者：
+    if (categoryDisplay) detailHtml.push("\u5206\u985e\uff1a" + categoryDisplay); // 分類：
+    if (updateTime) detailHtml.push("\u66f4\u65b0\uff1a" + updateTime); // 更新：
+
     var result = {
         name: name,
         cover: cover,
         host: HOST,
         author: author,
         description: description,
-        detail: author ? "\u4f5c\u8005\uff1a" + author : "",  // 作者：
+        detail: detailHtml.join("<br>"),
         ongoing: ongoing
     };
     if (genres.length > 0) result.genres = genres;
