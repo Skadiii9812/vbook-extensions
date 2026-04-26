@@ -2,7 +2,7 @@
   "metadata": {
     "name": "Novel543",
     "author": "Skadi",
-    "version": 2,
+    "version": 3,
     "source": "https://www.novel543.com",
     "regexp": "(www\\.)?novel543\\.com\\/\\d{4,}\\d+\\/?$",
     "description": "Novel543",
