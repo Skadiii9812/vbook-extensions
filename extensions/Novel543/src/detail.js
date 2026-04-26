@@ -119,16 +119,6 @@ function execute(url) {
         });
     }
 
-    // --- Comments ---
-    var bookIdMatch = storyUrl.match(/\/(\d{10,})\/?$/);
-    var comments = [];
-    if (bookIdMatch) {
-        comments.push({
-            title: "\u8a55\u8ad6",  // 評論
-            input: bookIdMatch[1],
-            script: "comment.js"
-        });
-    }
 
     // --- Category and Update Time for display ---
     var categoryDisplay = "";
@@ -161,7 +151,6 @@ function execute(url) {
     };
     if (genres.length > 0) result.genres = genres;
     if (suggests.length > 0) result.suggests = suggests;
-    if (comments.length > 0) result.comments = comments;
 
     return Response.success(result);
 }
