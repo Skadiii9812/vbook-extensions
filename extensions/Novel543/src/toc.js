@@ -13,7 +13,14 @@ function execute(url) {
     var seen = {};
 
     if (doc) {
-        var chapLinks = doc.select("a[href]");
+        var uls = doc.select(".chaplist ul");
+        var chapLinks;
+        if (uls.size() > 0) {
+            chapLinks = uls.last().select("a[href]");
+        } else {
+            chapLinks = doc.select("a[href]");
+        }
+        
         for (var i = 0; i < chapLinks.size(); i++) {
             var a = chapLinks.get(i);
             var href = a.attr("href") + "" || "";
@@ -36,7 +43,14 @@ function execute(url) {
     if (chapters.length === 0) {
         var detailDoc = fetchCFLight(storyUrl);
         if (detailDoc) {
-            var links2 = detailDoc.select(".chaplist a[href], a[href*='" + bookId + "'][href$='.html']");
+            var uls2 = detailDoc.select(".chaplist ul");
+            var links2;
+            if (uls2.size() > 0) {
+                links2 = uls2.last().select("a[href]");
+            } else {
+                links2 = detailDoc.select(".chaplist a[href], a[href*='" + bookId + "'][href$='.html']");
+            }
+
             for (var j = 0; j < links2.size(); j++) {
                 var a2 = links2.get(j);
                 var h2 = a2.attr("href") + "" || "";
