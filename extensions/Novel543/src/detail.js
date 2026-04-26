@@ -59,9 +59,20 @@ function execute(url) {
 
     // --- Status: 完結/連載 ---
     var ongoing = true;
-    var bodyText = doc.text() + "";
-    if (bodyText.indexOf("\u5b8c\u7d50") !== -1 || bodyText.indexOf("\u5168\u672c") !== -1) {  // 完結, 全本
-        ongoing = false;
+    var statusDisplay = "\u9023\u8f09"; // 連載
+    var statusEl = doc.select("meta[property='og:novel:status'], meta[name='og:novel:status']").first();
+    if (statusEl) {
+        var statusContent = statusEl.attr("content") + "";
+        if (statusContent) statusDisplay = statusContent;
+        if (statusContent.indexOf("\u5b8c\u7d50") >= 0 || statusContent.indexOf("\u5df2\u5b8c") >= 0) { // 完結, 已完
+            ongoing = false;
+        }
+    } else {
+        var bodyText = doc.text() + "";
+        if (bodyText.indexOf("\u5b8c\u7d50") !== -1 || bodyText.indexOf("\u5168\u672c") !== -1) {  // 完結, 全本
+            ongoing = false;
+            statusDisplay = "\u5b8c\u7d50"; // 完結
+        }
     }
 
     // --- Genre from breadcrumb or category link ---
@@ -136,6 +147,7 @@ function execute(url) {
     var detailHtml = [];
     if (author) detailHtml.push("\u4f5c\u8005\uff1a" + author); // 作者：
     if (categoryDisplay) detailHtml.push("\u5206\u985e\uff1a" + categoryDisplay); // 分類：
+    if (statusDisplay) detailHtml.push("\u72c0\u614b\uff1a" + statusDisplay); // 狀態：
     if (updateTime) detailHtml.push("\u66f4\u65b0\uff1a" + updateTime); // 更新：
 
     var result = {
