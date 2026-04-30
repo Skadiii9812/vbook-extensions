@@ -4,34 +4,19 @@ load('config.js');
 function execute(url) {
     url = url.replace("http://", "https://");
 
-    // Use Browser instead of fetch to bypass Cloudflare block
-    var browser = Engine.newBrowser();
-    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
-    browser.launchAsync(url);
-
-    let doc;
-    for (let i = 0; i < 30; i++) {
-        sleep(250);
-        doc = browser.html();
-        if (doc) {
-            let content = doc.select("#nr1").html();
-            // If chapter content is successfully loaded
-            if (content && content.length > 0) {
-                break;
-            }
-        }
-    }
-    extractCookiesFromBrowser(browser);
-    browser.close();
+    // 69shuba chapter pages serve full static HTML — no browser needed.
+    // fetchCF() uses cached CF cookie for instant lightweight fetch (~1-2s).
+    // This is critical for bulk downloads: eliminates WebView RAM spikes
+    // that previously caused random download hangs.
+    var doc = fetchCF(url);
 
     if (doc) {
         doc.select(".hide720, .ads, .txtinfo, .reader-ad, script").remove();
 
-        // 2. Get content from #nr1 tag
+        // Get content from #nr1 tag
         let content = doc.select("#nr1").html() + "";
 
         if (content) {
-            // 3. String processing (Regex clean text)
             content = content
                 // Replace special whitespace characters
                 .replace(/&nbsp;/g, " ")
@@ -45,8 +30,6 @@ function execute(url) {
                 // Remove extra redundant lines if any
                 .replace(/<p>.*?69shuba.*?<\/p>/g, "")
                 // Standardize all line spacing
-                // Ensure all <br>, <br/> tags, or newlines (\n) are converted to
-                // exactly 2 <br><br> tags to create readable spacing on mobile.
                 .replace(/<br\s*\/?>|\n/g, "<br><br>");
 
             return Response.success(content);

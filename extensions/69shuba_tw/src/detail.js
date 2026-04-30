@@ -27,7 +27,7 @@ function execute(url) {
 
         // Create detail info string (displays as subtitle on app)
         // Format: Author | Category | Status | Updated
-        let detailInfo = `類別: ${type}<br>狀態: ${status}<br><br>最新: ${latestChap}更新: ${updateTime}`;
+        let detailInfo = `類別: ${type}<br>狀態: ${status}<br>最新: ${latestChap}<br>更新: ${updateTime}`;
 
         return Response.success({
             name: name,

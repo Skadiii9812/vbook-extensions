@@ -23,7 +23,7 @@ function execute(url) {
 
     var doc;
     for (var i = 0; i < 30; i++) {
-        sleep(500);
+        sleep(250);
         doc = browser.html();
         if (doc && doc.select("div.s_m").size() > 0) {
             Console.log("[FEATURED] Content loaded at attempt " + i);
@@ -57,17 +57,17 @@ function execute(url) {
             var titleEl = featuredEl.select("a.s_title").first();
 
             if (titleEl) {
-                var name  = titleEl.text().trim() + "";
-                var link  = (titleEl.attr("href") || "") + "";
+                var name = titleEl.text().trim() + "";
+                var link = (titleEl.attr("href") || "") + "";
                 if (link && link.startsWith("/")) link = "https://69shuba.tw" + link;
 
                 if (name && link) {
                     list.push({
-                        name:        name,
-                        link:        link,
-                        cover:       getCoverFromLink(link),
+                        name: name,
+                        link: link,
+                        cover: getCoverFromLink(link),
                         description: "",
-                        host:        "https://69shuba.tw"
+                        host: "https://69shuba.tw"
                     });
                 }
             }
@@ -76,8 +76,8 @@ function execute(url) {
         // 2. Additional list items from div.s_list
         var listItems = section.select("div.s_list");
         for (var j = 0; j < listItems.size(); j++) {
-            var itemEl   = listItems.get(j);
-            var linkEl   = itemEl.select("a").first();
+            var itemEl = listItems.get(j);
+            var linkEl = itemEl.select("a").first();
             if (!linkEl) continue;
 
             var itemName = linkEl.text().trim() + "";
@@ -86,11 +86,11 @@ function execute(url) {
 
             if (itemName && itemLink) {
                 list.push({
-                    name:        itemName,
-                    link:        itemLink,
-                    cover:       getCoverFromLink(itemLink),
+                    name: itemName,
+                    link: itemLink,
+                    cover: getCoverFromLink(itemLink),
                     description: "",
-                    host:        "https://69shuba.tw"
+                    host: "https://69shuba.tw"
                 });
             }
         }
