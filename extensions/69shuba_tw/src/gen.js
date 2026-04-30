@@ -1,3 +1,5 @@
+load('config.js');
+
 function execute(url, page) {
     if (!url) return null;
     if (!page) page = '1';
@@ -13,6 +15,7 @@ function execute(url, page) {
     Console.log("[GEN] Launching: " + url);
 
     var browser = Engine.newBrowser();
+    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
     browser.launchAsync(url);
     
     var doc;
@@ -27,6 +30,7 @@ function execute(url, page) {
             }
         }
     }
+    extractCookiesFromBrowser(browser);
     browser.close();
     
     if (doc) {

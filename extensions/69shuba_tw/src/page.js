@@ -16,6 +16,7 @@ function execute(url) {
 
     // 2. USE BROWSER INSTEAD OF FETCH
     let browser = Engine.newBrowser();
+    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
 
     browser.launchAsync(indexUrl);
 
@@ -36,6 +37,7 @@ function execute(url) {
     }
 
     // Close browser to free memory
+    extractCookiesFromBrowser(browser);
     browser.close();
 
     if (doc) {

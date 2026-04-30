@@ -1,6 +1,8 @@
 // Derives the cover URL from the book link without any HTTP request.
 // Pattern confirmed: https://p.69shuba.tw/{first3}/{bookId}/{bookId}s.jpg
 // e.g. /book/344710/ → https://p.69shuba.tw/344/344710/344710s.jpg
+load('config.js');
+
 function getCoverFromLink(link) {
     var match = /\/book\/(\d+)\/?/.exec(link);
     if (!match) return "";
@@ -16,6 +18,7 @@ function execute(url) {
     Console.log("[FEATURED] Launching: " + url);
 
     var browser = Engine.newBrowser();
+    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
     browser.launchAsync(url);
 
     var doc;
@@ -27,6 +30,7 @@ function execute(url) {
             break;
         }
     }
+    extractCookiesFromBrowser(browser);
     browser.close();
     sleep(1500); // Allow WebView to fully release before next browser session (toc.js)
 

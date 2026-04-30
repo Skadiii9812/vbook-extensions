@@ -6,11 +6,12 @@ function execute(url) {
 
     // Use Browser instead of fetch to bypass Cloudflare block
     var browser = Engine.newBrowser();
+    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
     browser.launchAsync(url);
 
     let doc;
-    for (let i = 0; i < 20; i++) {
-        sleep(1000);
+    for (let i = 0; i < 30; i++) {
+        sleep(250);
         doc = browser.html();
         if (doc) {
             let content = doc.select("#nr1").html();
@@ -20,10 +21,11 @@ function execute(url) {
             }
         }
     }
+    extractCookiesFromBrowser(browser);
     browser.close();
 
     if (doc) {
-        doc.select(".hide720, .ads, .txtinfo").remove();
+        doc.select(".hide720, .ads, .txtinfo, .reader-ad, script").remove();
 
         // 2. Get content from #nr1 tag
         let content = doc.select("#nr1").html() + "";

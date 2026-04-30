@@ -15,6 +15,7 @@ function execute(url) {
     }
 
     var browser = Engine.newBrowser();
+    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
     browser.launchAsync(url);
 
     let doc;
@@ -32,6 +33,7 @@ function execute(url) {
             }
         }
     }
+    extractCookiesFromBrowser(browser);
     browser.close();
 
     if (doc) {

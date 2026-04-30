@@ -1,13 +1,19 @@
+load('config.js');
+
 function execute(key, page) {
     if (!page) page = '1';
     
-    // 69shuba search usually requires POST
-    // We try fetch first. If Cloudflare blocks it, we might need browser.
+    // 69shuba search requires POST.
+    // Inject cached CF cookie if available for resilience against CF blocks.
+    var searchHeaders = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    };
+    var cfCookie = loadCookie();
+    if (cfCookie) searchHeaders["Cookie"] = cfCookie;
+
     let response = fetch("https://69shuba.tw/search/", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        },
+        headers: searchHeaders,
         body: "searchkey=" + encodeURIComponent(key) + "&searchtype=all"
     });
 
