@@ -134,10 +134,22 @@ function execute(url) {
         }
     }
 
+    var latestChapter = "";
+    var latestMeta = selFirst(doc, "meta[property='og:novel:latest_chapter_name'], meta[name='og:novel:latest_chapter_name']");
+    if (latestMeta) {
+        latestChapter = latestMeta.attr("content") + "";
+    }
+    if (!latestChapter) {
+        var latestEl = selFirst(doc, ".chaplist ul li a");
+        if (latestEl) {
+            latestChapter = latestEl.text().trim() + "";
+        }
+    }
+
     var detailHtml = [];
-    if (author) detailHtml.push("\u4f5c\u8005\uff1a" + author); // 作者：
     if (categoryDisplay) detailHtml.push("\u5206\u985e\uff1a" + categoryDisplay); // 分類：
     if (statusDisplay) detailHtml.push("\u72c0\u614b\uff1a" + statusDisplay); // 狀態：
+    if (latestChapter) detailHtml.push("\u6700\u65b0\uff1a" + latestChapter); // 最新章節
     if (updateTime) detailHtml.push("\u66f4\u65b0\uff1a" + updateTime); // 更新：
 
     var result = {

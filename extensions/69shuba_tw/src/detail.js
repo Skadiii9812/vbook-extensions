@@ -8,7 +8,7 @@ function execute(url) {
 
     if (response.ok) {
         let doc = response.html();
-        
+
         // --- GET DATA FROM META TAGS (Added + "" for Rhino data type safety) ---
         let name = doc.select('meta[property="og:title"]').attr("content") + "";
         let cover = doc.select('meta[property="og:image"]').attr("content") + "";
@@ -29,7 +29,7 @@ function execute(url) {
 
         // Create detail info string (displays as subtitle on app)
         // Format: Author | Category | Status | Updated
-        let detailInfo = `Author: ${author}<br>Category: ${type}<br>Status: ${status}<br>Updated: ${updateTime}<br>Latest: ${latestChap}`;
+        let detailInfo = `作者: ${author}<br>類別: ${type}<br>狀態: ${status}<br>更新: ${updateTime}<br>最新: ${latestChap}`;
 
         return Response.success({
             name: name,
