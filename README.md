@@ -40,7 +40,7 @@ https://raw.githubusercontent.com/Skadiii9812/vbook-extensions/main/plugin.json
 2. Tìm extension cần cập nhật → nhấn **Kiểm tra cập nhật** (hoặc pull-to-refresh)
 3. Nếu có bản mới → nút **Cập nhật** sẽ xuất hiện → nhấn để tải về
 
-> ⚠️ Lưu ý: ứng dụng không tự động thông báo khi có cập nhật. Cần vào trang Extensions để kiểm tra thủ công.
+> ⚠️ Lưu ý: ứng dụng đôi khi không tự động thông báo khi có cập nhật. Cần vào trang Extensions để kiểm tra thủ công.
 
 ---
 
