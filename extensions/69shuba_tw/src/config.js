@@ -31,7 +31,9 @@ var _CF_COOKIE_KEY = "69sh_cf";
 var _CF_COOKIE_TS_KEY = "69sh_cf_ts";
 var _CF_PROBE_TS_KEY = "69sh_cf_probe_ts";
 var _CF_COOKIE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
-var _CF_PROBE_MAX_AGE_MS = 10 * 60 * 1000;
+var _CF_PROBE_MAX_AGE_MS = 30 * 60 * 1000;
+var _LAST_INDEX_OK_KEY = "69sh_last_index_ok_ts";
+var _INDEX_OK_MAX_AGE_MS = 30 * 60 * 1000;
 var _DETAIL_SYNC_PREFIX = "69sh_detail_sync_ts_";
 var _DETAIL_SYNC_TTL_MS = 5 * 60 * 1000;
 
@@ -82,6 +84,18 @@ function isCfProbeRecent() {
     try {
         var ts = parseInt(localStorage.getItem(_CF_PROBE_TS_KEY) || "0", 10);
         return ts > 0 && (Date.now() - ts) < _CF_PROBE_MAX_AGE_MS;
+    } catch (e) {}
+    return false;
+}
+
+function markIndexFetchOk() {
+    try { localStorage.setItem(_LAST_INDEX_OK_KEY, String(Date.now())); } catch (e) {}
+}
+
+function isIndexFetchRecent() {
+    try {
+        var ts = parseInt(localStorage.getItem(_LAST_INDEX_OK_KEY) || "0", 10);
+        return ts > 0 && (Date.now() - ts) < _INDEX_OK_MAX_AGE_MS;
     } catch (e) {}
     return false;
 }
@@ -282,6 +296,9 @@ function fetchFast(url, skipInvalidate) {
             if (doc && isValid69shDoc(doc, url)) {
                 markCfProbeOk();
                 markGlobalFetch();
+                if (url.indexOf("/indexlist/") >= 0 || url.indexOf("/book/") >= 0) {
+                    markIndexFetchOk();
+                }
                 return doc;
             }
             if (doc && isCfChallengeText(doc.text() + "")) {
@@ -307,6 +324,9 @@ function fetchBrowserCF(url, timeout) {
             extractCookiesFromBrowser(browser);
             markCfProbeOk();
             markGlobalFetch();
+            if (url.indexOf("/indexlist/") >= 0 || url.indexOf("/book/") >= 0) {
+                markIndexFetchOk();
+            }
         } else {
             doc = null;
             handleCfStress();
@@ -333,7 +353,8 @@ function fetchCF(url) {
 }
 
 function canUseTocCache() {
-    return isCfProbeRecent() && loadCookie();
+    if (!loadCookie() || isCookieStale()) return false;
+    return isCfProbeRecent() || isIndexFetchRecent();
 }
 
 // ============ Throttled fetch (TOC pagination / burst calls) ============
@@ -459,6 +480,7 @@ function parseChapterList(doc, host) {
 
 // ============ TOC page cache (auto-check) ============
 var _TOC_CACHE_PREFIX = "69sh_toc_";
+var _PAGE_LIST_PREFIX = "69sh_pages_";
 var _UPDATE_TIME_PREFIX = "69sh_ut_";
 
 function getTocCacheKey(indexUrl) {
@@ -492,8 +514,35 @@ function setTocPageCache(indexUrl, chapters) {
     } catch (e) {}
 }
 
+function invalidatePageListCache(bookId) {
+    if (!bookId) return;
+    try { localStorage.removeItem(_PAGE_LIST_PREFIX + bookId); } catch (e) {}
+}
+
+function getPageListCache(bookId) {
+    if (!bookId) return null;
+    try {
+        var raw = localStorage.getItem(_PAGE_LIST_PREFIX + bookId);
+        if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return null;
+}
+
+function setPageListCache(bookId, pageUrls) {
+    if (!bookId || !pageUrls || pageUrls.length === 0) return;
+    var updateTime = getBookUpdateTime(bookId);
+    try {
+        localStorage.setItem(_PAGE_LIST_PREFIX + bookId, JSON.stringify({
+            pageUrls: pageUrls,
+            updateTime: updateTime,
+            ts: Date.now()
+        }));
+    } catch (e) {}
+}
+
 function invalidateTocCache(bookId) {
     if (!bookId) return;
+    invalidatePageListCache(bookId);
     for (var p = 1; p <= 20; p++) {
         try { localStorage.removeItem(_TOC_CACHE_PREFIX + bookId + "_p" + p); } catch (e) {}
     }
@@ -533,6 +582,7 @@ function syncTocCacheValidity(bookId, updateTime) {
         if (prev && prev !== updateTime) {
             invalidateTocCache(bookId);
             invalidateDetailCache(bookId);
+            invalidatePageListCache(bookId);
         }
         localStorage.setItem(key, updateTime);
     } catch (e) {}
@@ -563,19 +613,29 @@ function shouldSkipDetailRefresh(bookId) {
     return false;
 }
 
-function fetchBookUpdateTime(bookUrl) {
-    bookUrl = (bookUrl || "").replace("http://", "https://");
-    var doc = fetchCF(bookUrl);
+function readUpdateTimeFromDoc(doc, bookUrl) {
     if (!doc) return "";
     var updateTime = doc.select('meta[property="og:novel:update_time"]').attr("content") + "";
-    var bookIdMatch = bookUrl.match(/\/book\/(\d+)/);
+    var bookIdMatch = (bookUrl || "").match(/\/book\/(\d+)/);
     if (bookIdMatch && bookIdMatch[1] && updateTime) {
         markBookDetailSynced(bookIdMatch[1], updateTime);
     }
     return updateTime;
 }
 
-function ensureTocCacheFresh(bookUrl, forceCheck) {
+function fetchBookUpdateTimeOnce(bookUrl) {
+    bookUrl = (bookUrl || "").replace("http://", "https://");
+    var doc = fetchCFOnce(bookUrl);
+    return readUpdateTimeFromDoc(doc, bookUrl);
+}
+
+function fetchBookUpdateTime(bookUrl) {
+    bookUrl = (bookUrl || "").replace("http://", "https://");
+    var doc = fetchCF(bookUrl);
+    return readUpdateTimeFromDoc(doc, bookUrl);
+}
+
+function ensureTocCacheFresh(bookUrl, forceCheck, cfReady) {
     bookUrl = (bookUrl || "").replace("http://", "https://");
     var bookIdMatch = bookUrl.match(/\/book\/(\d+)/);
     if (!bookIdMatch || !bookIdMatch[1]) return;
@@ -584,8 +644,15 @@ function ensureTocCacheFresh(bookUrl, forceCheck) {
         Console.log("[69sh] ensureTocCacheFresh skip bookId=" + bookId);
         return;
     }
-    var updateTime = fetchBookUpdateTime(bookUrl);
+    var updateTime = cfReady ? fetchBookUpdateTimeOnce(bookUrl) : fetchBookUpdateTime(bookUrl);
     if (updateTime) {
         syncTocCacheValidity(bookId, updateTime);
     }
+}
+
+function isIndexlistPageOne(indexUrl) {
+    var m = (indexUrl || "").match(/\/indexlist\/(\d+)\/?(\d*)/);
+    if (!m) return false;
+    var pageNum = m[2] || "";
+    return pageNum === "" || pageNum === "1";
 }

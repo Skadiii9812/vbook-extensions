@@ -11,6 +11,7 @@ function execute(url) {
         var ut = getBookUpdateTime(bookId);
         if (cached && cached.name && ut && cached.updateTime === ut && isCfProbeRecent()) {
             Console.log("[69sh] detail cache hit bookId=" + bookId);
+            markBookDetailSynced(bookId, ut);
             return Response.success({
                 name: cached.name,
                 cover: cached.cover,
