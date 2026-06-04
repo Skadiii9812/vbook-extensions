@@ -18,6 +18,7 @@ function execute(url) {
         var cachedEarly = getPageListCache(bookId);
         if (cachedEarly && cachedEarly.pageUrls && cachedEarly.pageUrls.length > 0 && utEarly && cachedEarly.updateTime === utEarly) {
             Console.log("[PAGE] skip detail");
+            prewarmTocPagesForUpdate(bookId, cachedEarly.pageUrls);
             Console.log("[PAGE] pages from cache: " + cachedEarly.pageUrls.length + " ms=" + (Date.now() - t0));
             return Response.success(cachedEarly.pageUrls);
         }
@@ -34,6 +35,7 @@ function execute(url) {
     var ut = getBookUpdateTime(bookId);
     var cachedPages = bookId ? getPageListCache(bookId) : null;
     if (cachedPages && cachedPages.pageUrls && cachedPages.pageUrls.length > 0 && ut && cachedPages.updateTime === ut) {
+        prewarmTocPagesForUpdate(bookId, cachedPages.pageUrls);
         Console.log("[PAGE] pages from cache: " + cachedPages.pageUrls.length + " ms=" + (Date.now() - t0));
         return Response.success(cachedPages.pageUrls);
     }
@@ -49,7 +51,12 @@ function execute(url) {
     var pageList = parseIndexPages(doc, indexUrl);
     if (bookId) {
         setPageListCache(bookId, pageList);
+        var list = parseChapterList(doc, BASE_URL);
+        if (list.length > 0) {
+            setTocPageCache(indexUrl, list);
+        }
     }
+    prewarmTocPagesForUpdate(bookId, pageList);
     Console.log("[PAGE] pages fetched: " + pageList.length + " ms=" + (Date.now() - t0));
     return Response.success(pageList);
 }

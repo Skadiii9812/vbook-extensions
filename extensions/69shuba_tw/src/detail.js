@@ -72,6 +72,7 @@ function execute(url) {
             ongoing: ongoing,
             updateTime: updateTime
         });
+        warmIndexlistFromDetail(bookId);
     }
 
     return Response.success(result);

@@ -656,3 +656,50 @@ function isIndexlistPageOne(indexUrl) {
     var pageNum = m[2] || "";
     return pageNum === "" || pageNum === "1";
 }
+
+var _PREWARM_MAX_PAGES = 12;
+
+function warmIndexlistFromDetail(bookId) {
+    if (!bookId) return;
+    var indexUrl = BASE_URL + "/indexlist/" + bookId + "/";
+    var ut = getBookUpdateTime(bookId);
+    var cached = getTocPageCache(indexUrl);
+    if (cached && cached.chapters && cached.chapters.length > 0 && ut && cached.updateTime === ut) {
+        var pages = getPageListCache(bookId);
+        if (pages && pages.pageUrls && pages.pageUrls.length > 0) return;
+    }
+    var doc = fetchCFOnce(indexUrl);
+    if (!doc || !isValidIndexDoc(doc)) return;
+    var pageList = parseIndexPages(doc, indexUrl);
+    if (pageList.length > 0) setPageListCache(bookId, pageList);
+    var list = parseChapterList(doc, BASE_URL);
+    if (list.length > 0) {
+        setTocPageCache(indexUrl, list);
+        Console.log("[69sh] detail warm index p1 chapters=" + list.length);
+    }
+}
+
+function prewarmTocPagesForUpdate(bookId, pageList) {
+    if (!bookId || !pageList || pageList.length === 0) return;
+    if (!shouldSkipDetailRefresh(bookId)) return;
+    var ut = getBookUpdateTime(bookId);
+    var max = pageList.length;
+    if (max > _PREWARM_MAX_PAGES) max = _PREWARM_MAX_PAGES;
+    var warmed = 0;
+    for (var i = 0; i < max; i++) {
+        var pageUrl = pageList[i];
+        var cached = getTocPageCache(pageUrl);
+        if (cached && cached.chapters && cached.chapters.length > 0 && ut && cached.updateTime === ut) {
+            continue;
+        }
+        var doc = fetchCFOnce(pageUrl);
+        if (!doc || !isValidIndexDoc(doc)) continue;
+        var list = parseChapterList(doc, BASE_URL);
+        if (list.length === 0) continue;
+        setTocPageCache(pageUrl, list);
+        warmed++;
+    }
+    if (warmed > 0) {
+        Console.log("[PAGE] prewarm toc pages=" + warmed);
+    }
+}

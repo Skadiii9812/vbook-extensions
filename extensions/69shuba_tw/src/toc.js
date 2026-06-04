@@ -27,8 +27,14 @@ function execute(url) {
         return Response.success(cached.chapters);
     }
 
-    Console.log("[TOC] fetch throttled");
-    var doc = fetchCFThrottled(indexUrl);
+    var doc;
+    if (bookId && shouldSkipDetailRefresh(bookId)) {
+        Console.log("[TOC] fetch post-detail");
+        doc = fetchCFOnce(indexUrl);
+    } else {
+        Console.log("[TOC] fetch throttled");
+        doc = fetchCFThrottled(indexUrl);
+    }
     if (!doc || !isValidIndexDoc(doc)) {
         Console.log("[TOC] failed to load indexlist ms=" + (Date.now() - t0));
         if (bookId) invalidateTocCache(bookId);
