@@ -327,3 +327,28 @@ function syncTocCacheValidity(bookId, updateTime) {
         localStorage.setItem(key, updateTime);
     } catch (e) {}
 }
+
+function getBookUpdateTime(bookId) {
+    if (!bookId) return "";
+    try {
+        return localStorage.getItem(_UPDATE_TIME_PREFIX + bookId) + "";
+    } catch (e) {}
+    return "";
+}
+
+function fetchBookUpdateTime(bookUrl) {
+    bookUrl = (bookUrl || "").replace("http://", "https://");
+    var doc = fetchCF(bookUrl);
+    if (!doc) return "";
+    return doc.select('meta[property="og:novel:update_time"]').attr("content") + "";
+}
+
+function ensureTocCacheFresh(bookUrl) {
+    bookUrl = (bookUrl || "").replace("http://", "https://");
+    var bookIdMatch = bookUrl.match(/\/book\/(\d+)/);
+    if (!bookIdMatch || !bookIdMatch[1]) return;
+    var updateTime = fetchBookUpdateTime(bookUrl);
+    if (updateTime) {
+        syncTocCacheValidity(bookIdMatch[1], updateTime);
+    }
+}
