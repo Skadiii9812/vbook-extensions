@@ -124,6 +124,64 @@ function invalidateCookie() {
         localStorage.removeItem(_CF_COOKIE_TS_KEY);
         localStorage.removeItem(_CF_PROBE_TS_KEY);
     } catch (e) {}
+    setThrottleColdFor(_THROTTLE_COLD_MS);
+}
+
+var _GLOBAL_FETCH_MIN_MS = 400;
+var _LAST_ANY_FETCH_KEY = "69sh_last_any_fetch";
+var _THROTTLE_COLD_UNTIL_KEY = "69sh_throttle_cold_until";
+var _THROTTLE_COLD_MS = 5 * 60 * 1000;
+var _FETCH_MIN_MS_HOT = 750;
+var _FETCH_MIN_MS_COLD = 1000;
+var _FETCH_MIN_MS_FLOOR = 500;
+var _LAST_FETCH_KEY = "69sh_last_fetch";
+var _DETAIL_CACHE_PREFIX = "69sh_detail_";
+var _DETAIL_CACHE_TTL_MS = 30 * 60 * 1000;
+
+function globalFetchWait() {
+    var now = Date.now();
+    var last = 0;
+    try {
+        last = parseInt(localStorage.getItem(_LAST_ANY_FETCH_KEY) || "0", 10);
+    } catch (e) {}
+    var gap = now - last;
+    if (gap < _GLOBAL_FETCH_MIN_MS) {
+        sleep(_GLOBAL_FETCH_MIN_MS - gap);
+    }
+}
+
+function markGlobalFetch() {
+    try {
+        localStorage.setItem(_LAST_ANY_FETCH_KEY, String(Date.now()));
+    } catch (e) {}
+}
+
+function isThrottleColdForced() {
+    try {
+        var until = parseInt(localStorage.getItem(_THROTTLE_COLD_UNTIL_KEY) || "0", 10);
+        return until > 0 && Date.now() < until;
+    } catch (e) {}
+    return false;
+}
+
+function setThrottleColdFor(ms) {
+    try {
+        localStorage.setItem(_THROTTLE_COLD_UNTIL_KEY, String(Date.now() + ms));
+    } catch (e) {}
+}
+
+function getFetchMinMs() {
+    var minMs = _FETCH_MIN_MS_COLD;
+    if (!isThrottleColdForced() && isCfProbeRecent() && loadCookie()) {
+        minMs = _FETCH_MIN_MS_HOT;
+    }
+    if (minMs < _FETCH_MIN_MS_FLOOR) minMs = _FETCH_MIN_MS_FLOOR;
+    return minMs;
+}
+
+function handleCfStress() {
+    invalidateCookie();
+    setThrottleColdFor(_THROTTLE_COLD_MS);
 }
 
 function extractCookiesFromBrowser(browser) {
@@ -166,13 +224,16 @@ function probeCfSession() {
         return false;
     }
     if (!loadCookie()) return false;
+    globalFetchWait();
     var doc = fetchFast(_HOMEPAGE_URL, true);
     if (doc && isValid69shDoc(doc, _HOMEPAGE_URL)) {
         markCfProbeOk();
+        markGlobalFetch();
         Console.log("[69sh] probe ok");
         return true;
     }
     Console.log("[69sh] probe fail");
+    setThrottleColdFor(_THROTTLE_COLD_MS);
     return false;
 }
 
@@ -196,6 +257,7 @@ function warmupCF() {
 
 function ensureCfReady() {
     if (isCookieStale()) invalidateCookie();
+    if (isCfProbeRecent() && loadCookie()) return true;
     if (probeCfSession()) return true;
     invalidateCookie();
     return warmupCF();
@@ -205,6 +267,7 @@ function fetchFast(url, skipInvalidate) {
     if (isCookieStale()) invalidateCookie();
     var cookie = loadCookie();
     if (!cookie) return null;
+    globalFetchWait();
     try {
         var res = fetch(url, {
             headers: {
@@ -218,7 +281,11 @@ function fetchFast(url, skipInvalidate) {
             var doc = res.html();
             if (doc && isValid69shDoc(doc, url)) {
                 markCfProbeOk();
+                markGlobalFetch();
                 return doc;
+            }
+            if (doc && isCfChallengeText(doc.text() + "")) {
+                if (!skipInvalidate) handleCfStress();
             }
         }
     } catch (e) {}
@@ -228,6 +295,7 @@ function fetchFast(url, skipInvalidate) {
 
 function fetchBrowserCF(url, timeout) {
     var t = timeout !== undefined ? timeout : 15000;
+    globalFetchWait();
     var browser = Engine.newBrowser();
     var doc = null;
     try {
@@ -238,8 +306,10 @@ function fetchBrowserCF(url, timeout) {
         if (doc && !isCfChallengeText(doc.text() + "")) {
             extractCookiesFromBrowser(browser);
             markCfProbeOk();
+            markGlobalFetch();
         } else {
             doc = null;
+            handleCfStress();
         }
     } finally {
         browser.close();
@@ -247,9 +317,8 @@ function fetchBrowserCF(url, timeout) {
     return doc;
 }
 
-function fetchCF(url) {
+function fetchCFOnce(url) {
     url = (url || "").replace("http://", "https://");
-    ensureCfReady();
     var doc = fetchFast(url);
     if (doc) return doc;
     doc = fetchBrowserCF(url);
@@ -257,25 +326,28 @@ function fetchCF(url) {
     return null;
 }
 
+function fetchCF(url) {
+    url = (url || "").replace("http://", "https://");
+    ensureCfReady();
+    return fetchCFOnce(url);
+}
+
 function canUseTocCache() {
-    return isCfProbeRecent() || probeCfSession();
+    return isCfProbeRecent() && loadCookie();
 }
 
 // ============ Throttled fetch (TOC pagination / burst calls) ============
-// 1s gap between consecutive indexlist fetches — balances speed vs CF rate limits.
-// page.js uses unthrottled fetchCF (single request). Only toc.js paces multi-page fetches.
-var _FETCH_MIN_MS = 1000;
-var _LAST_FETCH_KEY = "69sh_last_fetch";
-
 function throttleWait() {
+    var minMs = getFetchMinMs();
+    Console.log("[69sh] throttle " + minMs + "ms" + (minMs === _FETCH_MIN_MS_HOT ? " hot" : " cold"));
     var now = Date.now();
     var last = 0;
     try {
         last = parseInt(localStorage.getItem(_LAST_FETCH_KEY) || "0", 10);
     } catch (e) {}
     var gap = now - last;
-    if (gap < _FETCH_MIN_MS) {
-        sleep(_FETCH_MIN_MS - gap);
+    if (gap < minMs) {
+        sleep(minMs - gap);
     }
 }
 
@@ -287,7 +359,8 @@ function markFetch() {
 
 function fetchCFThrottled(url) {
     throttleWait();
-    var doc = fetchCF(url);
+    ensureCfReady();
+    var doc = fetchCFOnce(url);
     markFetch();
     return doc;
 }
@@ -426,12 +499,41 @@ function invalidateTocCache(bookId) {
     }
 }
 
+function invalidateDetailCache(bookId) {
+    if (!bookId) return;
+    try { localStorage.removeItem(_DETAIL_CACHE_PREFIX + bookId); } catch (e) {}
+}
+
+function getDetailCache(bookId) {
+    if (!bookId) return null;
+    try {
+        var raw = localStorage.getItem(_DETAIL_CACHE_PREFIX + bookId);
+        if (!raw) return null;
+        var cached = JSON.parse(raw);
+        if (!cached || !cached.ts) return null;
+        if ((Date.now() - cached.ts) > _DETAIL_CACHE_TTL_MS) return null;
+        return cached;
+    } catch (e) {}
+    return null;
+}
+
+function setDetailCache(bookId, payload) {
+    if (!bookId || !payload) return;
+    try {
+        payload.ts = Date.now();
+        localStorage.setItem(_DETAIL_CACHE_PREFIX + bookId, JSON.stringify(payload));
+    } catch (e) {}
+}
+
 function syncTocCacheValidity(bookId, updateTime) {
     if (!bookId || !updateTime) return;
     try {
         var key = _UPDATE_TIME_PREFIX + bookId;
         var prev = localStorage.getItem(key) + "";
-        if (prev && prev !== updateTime) invalidateTocCache(bookId);
+        if (prev && prev !== updateTime) {
+            invalidateTocCache(bookId);
+            invalidateDetailCache(bookId);
+        }
         localStorage.setItem(key, updateTime);
     } catch (e) {}
 }
@@ -473,12 +575,12 @@ function fetchBookUpdateTime(bookUrl) {
     return updateTime;
 }
 
-function ensureTocCacheFresh(bookUrl) {
+function ensureTocCacheFresh(bookUrl, forceCheck) {
     bookUrl = (bookUrl || "").replace("http://", "https://");
     var bookIdMatch = bookUrl.match(/\/book\/(\d+)/);
     if (!bookIdMatch || !bookIdMatch[1]) return;
     var bookId = bookIdMatch[1];
-    if (shouldSkipDetailRefresh(bookId)) {
+    if (!forceCheck && shouldSkipDetailRefresh(bookId)) {
         Console.log("[69sh] ensureTocCacheFresh skip bookId=" + bookId);
         return;
     }

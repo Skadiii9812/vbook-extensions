@@ -4,7 +4,7 @@ load('config.js');
 function execute(url) {
     Console.log("[PAGE] start: " + url);
 
-    ensureTocCacheFresh(url);
+    ensureTocCacheFresh(url, true);
 
     var indexUrl = resolveIndexUrl(url);
     var doc = fetchCF(indexUrl);

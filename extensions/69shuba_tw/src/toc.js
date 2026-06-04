@@ -8,7 +8,7 @@ function execute(url) {
     var bookIdMatch = indexUrl.match(/\/indexlist\/(\d+)/);
     var bookId = bookIdMatch && bookIdMatch[1] ? bookIdMatch[1] : "";
     if (bookId) {
-        ensureTocCacheFresh(BASE_URL + "/book/" + bookId + "/");
+        ensureTocCacheFresh(BASE_URL + "/book/" + bookId + "/", false);
     }
 
     var cached = getTocPageCache(indexUrl);
@@ -23,7 +23,7 @@ function execute(url) {
         Console.log("[TOC] failed to load indexlist");
         if (bookId) invalidateTocCache(bookId);
         var errMsg = "Cannot load TOC";
-        if (!canUseTocCache()) {
+        if (!isCfProbeRecent() || !loadCookie()) {
             errMsg = "Cloudflare session expired — open 69shuba.tw in app browser once";
         }
         return Response.error(errMsg);
