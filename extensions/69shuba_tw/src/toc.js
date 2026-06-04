@@ -13,7 +13,7 @@ function execute(url) {
 
     var cached = getTocPageCache(indexUrl);
     var ut = getBookUpdateTime(bookId);
-    if (cached && cached.chapters && cached.chapters.length > 0 && ut && cached.updateTime === ut) {
+    if (cached && cached.chapters && cached.chapters.length > 0 && ut && cached.updateTime === ut && canUseTocCache()) {
         Console.log("[TOC] cache hit: " + cached.chapters.length);
         return Response.success(cached.chapters);
     }
@@ -21,7 +21,12 @@ function execute(url) {
     var doc = fetchCFThrottled(indexUrl);
     if (!doc || !isValidIndexDoc(doc)) {
         Console.log("[TOC] failed to load indexlist");
-        return Response.error("Cannot load TOC");
+        if (bookId) invalidateTocCache(bookId);
+        var errMsg = "Cannot load TOC";
+        if (!canUseTocCache()) {
+            errMsg = "Cloudflare session expired — open 69shuba.tw in app browser once";
+        }
+        return Response.error(errMsg);
     }
 
     var list = parseChapterList(doc, BASE_URL);

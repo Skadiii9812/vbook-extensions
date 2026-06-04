@@ -2,16 +2,17 @@ load('config.js');
 
 function execute(key, page) {
     if (!page) page = '1';
-    
-    // 69shuba search requires POST.
-    // Inject cached CF cookie if available for resilience against CF blocks.
+
+    ensureCfReady();
     var searchHeaders = {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": _cfUA,
+        "Accept-Language": "zh-TW,zh;q=0.9"
     };
     var cfCookie = loadCookie();
     if (cfCookie) searchHeaders["Cookie"] = cfCookie;
 
-    let response = fetch("https://69shuba.tw/search/", {
+    let response = fetch(BASE_URL + "/search/", {
         method: "POST",
         headers: searchHeaders,
         body: "searchkey=" + encodeURIComponent(key) + "&searchtype=all"
@@ -19,6 +20,9 @@ function execute(key, page) {
 
     if (response.ok) {
         let doc = response.html();
+        if (!doc || !isValid69shDoc(doc, BASE_URL + "/search/")) {
+            return Response.error("Cannot load search — Cloudflare session expired");
+        }
         let list = [];
         let items = doc.select("table.list-item");
         
@@ -39,15 +43,15 @@ function execute(key, page) {
                 let description = introEl ? introEl.text().trim() : "";
                 
                 if (link.startsWith("/")) {
-                    link = "https://69shuba.tw" + link;
+                    link = BASE_URL + link;
                 }
-                
+
                 list.push({
                     name: name,
                     link: link,
                     cover: cover,
                     description: author ? author : description,
-                    host: "https://69shuba.tw"
+                    host: BASE_URL
                 });
             }
         }
@@ -55,5 +59,5 @@ function execute(key, page) {
         return Response.success(list);
     }
     
-    return null;
+    return Response.error("Search request failed");
 }

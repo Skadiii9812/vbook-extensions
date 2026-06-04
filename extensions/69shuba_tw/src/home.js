@@ -1,4 +1,7 @@
+load("config.js");
+
 function execute() {
+    ensureCfReady();
     return Response.success([
         { title: "精選推薦", input: "https://69shuba.tw/", script: "featured.js" },
         { title: "玄幻魔法", input: "https://69shuba.tw/fenlei/xuanhuan/{{page}}/", script: "gen.js" },

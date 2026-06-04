@@ -2,7 +2,7 @@
     "metadata": {
         "name": "69shuba_tw",
         "author": "Skadi",
-        "version": 9,
+        "version": 10,
         "source": "https://69shuba.tw",
         "regexp": "https?:\\/\\/(?:www\\.)?69shuba\\.tw/book/\\d+/?$",
         "description": "69shuba_tw",

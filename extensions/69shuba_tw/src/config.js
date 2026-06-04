@@ -23,23 +23,79 @@ var _BLOCK_HEAVY = [
 ];
 
 // ============ Cloudflare Cookie System ============
-// After first browser CF bypass, Android WebView stores cf_clearance cookie.
-// We extract and reuse it for all fetch() calls — making them instant.
 var _cfCookie = null;
 var _cfUA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 var _cfReady = false;
+var _HOMEPAGE_URL = BASE_URL + "/";
+var _CF_COOKIE_KEY = "69sh_cf";
+var _CF_COOKIE_TS_KEY = "69sh_cf_ts";
+var _CF_PROBE_TS_KEY = "69sh_cf_probe_ts";
+var _CF_COOKIE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+var _CF_PROBE_MAX_AGE_MS = 10 * 60 * 1000;
+var _DETAIL_SYNC_PREFIX = "69sh_detail_sync_ts_";
+var _DETAIL_SYNC_TTL_MS = 5 * 60 * 1000;
 
-// --- Cookie Storage ---
+function isCfChallengeText(t) {
+    t = (t || "") + "";
+    if (t.length < 200) return true;
+    if (t.indexOf("Just a moment") >= 0) return true;
+    if (t.indexOf("Please complete human verification") >= 0) return true;
+    if (t.indexOf("Verify you are human") >= 0) return true;
+    return false;
+}
+
+function isValid69shDoc(doc, url) {
+    if (!doc) return false;
+    var t = doc.text() + "";
+    if (isCfChallengeText(t)) return false;
+    url = (url || "") + "";
+    if (url.indexOf("/indexlist/") >= 0) return isValidIndexDoc(doc);
+    if (url.indexOf("/book/") >= 0) {
+        var metaTitle = doc.select('meta[property="og:title"]').attr("content") + "";
+        return metaTitle.length > 0 || t.indexOf("69\u66f8\u5427") >= 0;
+    }
+    if (url.indexOf("/txt/") >= 0 || url.indexOf("/read/") >= 0) {
+        return doc.select("#nr1").size() > 0 || t.length > 500;
+    }
+    if (url.indexOf("/search") >= 0) {
+        return doc.select("table.list-item").size() > 0 || t.length > 500;
+    }
+    var title = doc.select("title").text() + "";
+    return title.indexOf("69\u66f8\u5427") >= 0 || t.indexOf("69\u66f8\u5427") >= 0;
+}
+
+function isCookieStale() {
+    try {
+        var ts = parseInt(localStorage.getItem(_CF_COOKIE_TS_KEY) || "0", 10);
+        if (!ts) return !loadCookie();
+        return (Date.now() - ts) > _CF_COOKIE_MAX_AGE_MS;
+    } catch (e) {}
+    return false;
+}
+
+function markCfProbeOk() {
+    _cfReady = true;
+    try { localStorage.setItem(_CF_PROBE_TS_KEY, String(Date.now())); } catch (e) {}
+}
+
+function isCfProbeRecent() {
+    try {
+        var ts = parseInt(localStorage.getItem(_CF_PROBE_TS_KEY) || "0", 10);
+        return ts > 0 && (Date.now() - ts) < _CF_PROBE_MAX_AGE_MS;
+    } catch (e) {}
+    return false;
+}
+
 function loadCookie() {
     if (_cfCookie) return _cfCookie;
     try {
-        var lc = localCookie.getCookie();
+        var lc = localCookie.getCookie() + "";
         if (lc && lc.length > 10) { _cfCookie = lc; return _cfCookie; }
-    } catch(e) {}
+    } catch (e) {}
     try {
-        var ls = localStorage.getItem("69sh_cf");
+        var ls = localStorage.getItem(_CF_COOKIE_KEY);
         if (ls && ls.length > 10) { _cfCookie = ls; return _cfCookie; }
-    } catch(e) {}
+    } catch (e) {}
     return null;
 }
 
@@ -47,65 +103,106 @@ function storeCookie(cookie) {
     if (!cookie || cookie.length < 5) return;
     _cfCookie = cookie;
     _cfReady = true;
-    try { localStorage.setItem("69sh_cf", cookie); } catch(e) {}
+    try {
+        localStorage.setItem(_CF_COOKIE_KEY, cookie);
+        localStorage.setItem(_CF_COOKIE_TS_KEY, String(Date.now()));
+    } catch (e) {}
     try {
         var parts = cookie.split(";");
         for (var i = 0; i < parts.length; i++) {
             var p = parts[i].trim();
             if (p) localCookie.setCookie(p);
         }
-    } catch(e) {}
+    } catch (e) {}
 }
 
 function invalidateCookie() {
     _cfCookie = null;
     _cfReady = false;
-    try { localStorage.removeItem("69sh_cf"); } catch(e) {}
+    try {
+        localStorage.removeItem(_CF_COOKIE_KEY);
+        localStorage.removeItem(_CF_COOKIE_TS_KEY);
+        localStorage.removeItem(_CF_PROBE_TS_KEY);
+    } catch (e) {}
 }
 
-// --- Extract cookies from an active browser session ---
 function extractCookiesFromBrowser(browser) {
     var cookie = "";
     try {
         browser.callJs("window._69shc = document.cookie;", 300);
         cookie = browser.getVariable("_69shc") + "";
-    } catch(e) {}
+    } catch (e) {}
     if (!cookie || cookie.length < 10) {
-        try { cookie = localCookie.getCookie() + ""; } catch(e) {}
+        try { cookie = localCookie.getCookie() + ""; } catch (e) {}
     }
     if (cookie && cookie.length > 5) {
         storeCookie(cookie);
     }
 }
 
-// ============ WARMUP: Solve CF once, cache forever ============
-// Launches homepage in browser once to get cf_clearance cookie.
-// Subsequent calls skip this entirely if cookie is cached.
-function warmupCF() {
-    if (_cfReady || loadCookie()) {
-        _cfReady = true;
+function waitForCfBrowser(browser, maxMs) {
+    var elapsed = 0;
+    var step = 250;
+    var limit = maxMs !== undefined ? maxMs : 20000;
+    var doc = null;
+    while (elapsed < limit) {
+        try { doc = browser.html(); } catch (e) { doc = null; }
+        if (doc) {
+            var t = doc.text() + "";
+            if (!isCfChallengeText(t) && (t.indexOf("69\u66f8\u5427") >= 0 || t.length > 800)) {
+                return doc;
+            }
+        }
+        sleep(step);
+        elapsed += step;
+    }
+    try { return browser.html(); } catch (e2) {}
+    return doc;
+}
+
+function probeCfSession() {
+    if (isCookieStale()) {
+        invalidateCookie();
+        return false;
+    }
+    if (!loadCookie()) return false;
+    var doc = fetchFast(_HOMEPAGE_URL, true);
+    if (doc && isValid69shDoc(doc, _HOMEPAGE_URL)) {
+        markCfProbeOk();
+        Console.log("[69sh] probe ok");
         return true;
     }
+    Console.log("[69sh] probe fail");
+    return false;
+}
+
+function warmupCF() {
+    if (probeCfSession()) return true;
+
+    Console.log("[69sh] warmup browser");
     var browser = Engine.newBrowser();
-    browser.setUserAgent(UserAgent.android());
-    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
-    var doc = browser.launch(BASE_URL + "/", 15000);
-    if (doc) {
-        var t = doc.text() + "";
-        // Wait longer if CF challenge or 69shuba content not yet loaded
-        if (t.length < 500 || t.indexOf("Just a moment") >= 0 || t.indexOf("69\u66f8\u5427") < 0) {
-            sleep(5000);
-            doc = browser.html();
-        }
+    try {
+        browser.setUserAgent(UserAgent.android());
+        browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
+        browser.launch(_HOMEPAGE_URL, 15000);
+        waitForCfBrowser(browser, 20000);
         extractCookiesFromBrowser(browser);
+    } finally {
+        browser.close();
     }
-    browser.close();
-    _cfReady = !!loadCookie();
+    _cfReady = probeCfSession();
     return _cfReady;
 }
 
-// ============ FAST FETCH: uses cached cookie (~1-2s) ============
-function fetchFast(url) {
+function ensureCfReady() {
+    if (isCookieStale()) invalidateCookie();
+    if (probeCfSession()) return true;
+    invalidateCookie();
+    return warmupCF();
+}
+
+function fetchFast(url, skipInvalidate) {
+    if (isCookieStale()) invalidateCookie();
     var cookie = loadCookie();
     if (!cookie) return null;
     try {
@@ -119,38 +216,49 @@ function fetchFast(url) {
         });
         if (res && res.ok) {
             var doc = res.html();
-            if (doc) {
-                var t = doc.text() + "";
-                if (t.length > 500 && t.indexOf("Just a moment") < 0) return doc;
+            if (doc && isValid69shDoc(doc, url)) {
+                markCfProbeOk();
+                return doc;
             }
         }
-    } catch(e) {}
-    invalidateCookie();
+    } catch (e) {}
+    if (!skipInvalidate) invalidateCookie();
     return null;
 }
 
-// ============ BROWSER FETCH: full browser with blocking (~5-10s) ============
 function fetchBrowserCF(url, timeout) {
     var t = timeout !== undefined ? timeout : 15000;
     var browser = Engine.newBrowser();
-    browser.setUserAgent(UserAgent.android());
-    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
-    var doc = browser.launch(url, t);
-    if (doc) extractCookiesFromBrowser(browser);
-    browser.close();
+    var doc = null;
+    try {
+        browser.setUserAgent(UserAgent.android());
+        browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
+        browser.launch(url, t);
+        doc = waitForCfBrowser(browser, 20000);
+        if (doc && !isCfChallengeText(doc.text() + "")) {
+            extractCookiesFromBrowser(browser);
+            markCfProbeOk();
+        } else {
+            doc = null;
+        }
+    } finally {
+        browser.close();
+    }
     return doc;
 }
 
-// ============ SMART FETCH: fast → warmup → browser ============
-// Use for pages that serve static HTML (detail, indexlist, chapter pages).
-// Never combine browser.block() + launchAsync() — sync launch only as last resort.
 function fetchCF(url) {
+    url = (url || "").replace("http://", "https://");
+    ensureCfReady();
     var doc = fetchFast(url);
     if (doc) return doc;
-    if (!_cfReady) warmupCF();
-    doc = fetchFast(url);
-    if (doc) return doc;
-    return fetchBrowserCF(url);
+    doc = fetchBrowserCF(url);
+    if (doc && isValid69shDoc(doc, url)) return doc;
+    return null;
+}
+
+function canUseTocCache() {
+    return isCfProbeRecent() || probeCfSession();
 }
 
 // ============ Throttled fetch (TOC pagination / burst calls) ============
@@ -336,19 +444,46 @@ function getBookUpdateTime(bookId) {
     return "";
 }
 
+function markBookDetailSynced(bookId, updateTime) {
+    if (!bookId) return;
+    try { localStorage.setItem(_DETAIL_SYNC_PREFIX + bookId, String(Date.now())); } catch (e) {}
+    if (updateTime) syncTocCacheValidity(bookId, updateTime);
+}
+
+function shouldSkipDetailRefresh(bookId) {
+    if (!bookId) return false;
+    var ut = getBookUpdateTime(bookId);
+    if (!ut) return false;
+    try {
+        var ts = parseInt(localStorage.getItem(_DETAIL_SYNC_PREFIX + bookId) || "0", 10);
+        return ts > 0 && (Date.now() - ts) < _DETAIL_SYNC_TTL_MS;
+    } catch (e) {}
+    return false;
+}
+
 function fetchBookUpdateTime(bookUrl) {
     bookUrl = (bookUrl || "").replace("http://", "https://");
     var doc = fetchCF(bookUrl);
     if (!doc) return "";
-    return doc.select('meta[property="og:novel:update_time"]').attr("content") + "";
+    var updateTime = doc.select('meta[property="og:novel:update_time"]').attr("content") + "";
+    var bookIdMatch = bookUrl.match(/\/book\/(\d+)/);
+    if (bookIdMatch && bookIdMatch[1] && updateTime) {
+        markBookDetailSynced(bookIdMatch[1], updateTime);
+    }
+    return updateTime;
 }
 
 function ensureTocCacheFresh(bookUrl) {
     bookUrl = (bookUrl || "").replace("http://", "https://");
     var bookIdMatch = bookUrl.match(/\/book\/(\d+)/);
     if (!bookIdMatch || !bookIdMatch[1]) return;
+    var bookId = bookIdMatch[1];
+    if (shouldSkipDetailRefresh(bookId)) {
+        Console.log("[69sh] ensureTocCacheFresh skip bookId=" + bookId);
+        return;
+    }
     var updateTime = fetchBookUpdateTime(bookUrl);
     if (updateTime) {
-        syncTocCacheValidity(bookIdMatch[1], updateTime);
+        syncTocCacheValidity(bookId, updateTime);
     }
 }

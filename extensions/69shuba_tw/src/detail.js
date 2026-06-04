@@ -3,6 +3,7 @@ load('config.js');
 
 function execute(url) {
     url = url.replace("http://", "https://");
+    ensureCfReady();
     var doc = fetchCF(url);
 
     if (!doc) {
@@ -21,7 +22,7 @@ function execute(url) {
 
     var bookIdMatch = url.match(/\/book\/(\d+)/);
     if (bookIdMatch && bookIdMatch[1] && updateTime) {
-        syncTocCacheValidity(bookIdMatch[1], updateTime);
+        markBookDetailSynced(bookIdMatch[1], updateTime);
     }
 
     if (cover && cover.indexOf("//") === 0) {
