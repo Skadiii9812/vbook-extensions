@@ -6,7 +6,7 @@ function execute(url) {
     url = url.replace("http://", "https://");
     Console.log("[CHAP] start: " + url);
 
-    // /read/ → optional /txt/ fetchFast, else bounded WebView; never fetchFast on /read/ (hang risk).
+    // Referer cookie fetch on /read/, then bounded async WebView; never blocking fetch on /txt/.
     var doc = fetchChapCF(url);
 
     if (!doc) {
