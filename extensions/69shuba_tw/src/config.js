@@ -306,8 +306,47 @@ function fetchFast(url, skipInvalidate) {
             }
         }
     } catch (e) {}
-    if (!skipInvalidate) invalidateCookie();
     return null;
+}
+
+// Bounded browser fetch for chapter pages (69shuba /read/ often needs WebView).
+function fetchBrowserChap(url) {
+    globalFetchWait();
+    var browser = Engine.newBrowser();
+    var doc = null;
+    try {
+        browser.setUserAgent(UserAgent.android());
+        browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
+        browser.launch(url, 10000);
+        doc = waitForCfBrowser(browser, 8000);
+        if (doc && !isCfChallengeText(doc.text() + "") && isValid69shDoc(doc, url)) {
+            extractCookiesFromBrowser(browser);
+            markCfProbeOk();
+            markGlobalFetch();
+        } else {
+            doc = null;
+        }
+    } finally {
+        browser.close();
+    }
+    return doc;
+}
+
+// Chapter download: skip redundant warmup when cookie/probe fresh; fail fast on bad URLs.
+function fetchChapCF(url) {
+    url = (url || "").replace("http://", "https://");
+    if (!loadCookie()) {
+        ensureCfReady();
+    } else if (!isCfProbeRecent() && !probeCfSession()) {
+        ensureCfReady();
+    }
+    globalFetchWait();
+    var doc = fetchFast(url, true);
+    if (doc) return doc;
+    sleep(500);
+    doc = fetchFast(url, true);
+    if (doc) return doc;
+    return fetchBrowserChap(url);
 }
 
 function fetchBrowserCF(url, timeout) {

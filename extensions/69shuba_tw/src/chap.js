@@ -2,38 +2,37 @@ load('libs.js');
 load('config.js');
 
 function execute(url) {
+    var t0 = Date.now();
     url = url.replace("http://", "https://");
+    Console.log("[CHAP] start: " + url);
 
-    // 69shuba chapter pages serve full static HTML — no browser needed.
-    // fetchCF() uses cached CF cookie for instant lightweight fetch (~1-2s).
-    // This is critical for bulk downloads: eliminates WebView RAM spikes
-    // that previously caused random download hangs.
-    var doc = fetchCF(url);
+    // Cookie fetch only — no per-chapter WebView (fetchChapCF in config.js).
+    var doc = fetchChapCF(url);
 
-    if (doc) {
-        doc.select(".hide720, .ads, .txtinfo, .reader-ad, script").remove();
-
-        // Get content from #nr1 tag
-        let content = doc.select("#nr1").html() + "";
-
-        if (content) {
-            content = content
-                // Replace special whitespace characters
-                .replace(/&nbsp;/g, " ")
-                // Remove "End of chapter" lines
-                .replace(/\(本章完\)/g, "")
-                .replace(/（本章完）/g, "")
-                // Remove web brand names (both Traditional and Simplified)
-                .replace(/69書吧/g, "")
-                .replace(/69书吧/g, "")
-                .replace(/www\.69shuba\.tw/g, "")
-                // Remove extra redundant lines if any
-                .replace(/<p>.*?69shuba.*?<\/p>/g, "")
-                // Standardize all line spacing
-                .replace(/<br\s*\/?>|\n/g, "<br><br>");
-
-            return Response.success(content);
-        }
+    if (!doc) {
+        Console.log("[CHAP] fetch fail ms=" + (Date.now() - t0));
+        return Response.error("Chapter load failed — open 69shuba.tw in app browser once, then retry");
     }
-    return null;
+
+    doc.select(".hide720, .ads, .txtinfo, .reader-ad, script").remove();
+
+    var content = doc.select("#nr1").html() + "";
+
+    if (!content || content.trim().length < 50) {
+        Console.log("[CHAP] empty #nr1 ms=" + (Date.now() - t0));
+        return Response.error("Chapter content not found");
+    }
+
+    content = content
+        .replace(/&nbsp;/g, " ")
+        .replace(/\(本章完\)/g, "")
+        .replace(/（本章完）/g, "")
+        .replace(/69書吧/g, "")
+        .replace(/69书吧/g, "")
+        .replace(/www\.69shuba\.tw/g, "")
+        .replace(/<p>.*?69shuba.*?<\/p>/g, "")
+        .replace(/<br\s*\/?>|\n/g, "<br><br>");
+
+    Console.log("[CHAP] ok len=" + content.length + " ms=" + (Date.now() - t0));
+    return Response.success(content);
 }
