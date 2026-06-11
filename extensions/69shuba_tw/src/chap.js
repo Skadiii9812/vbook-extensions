@@ -6,7 +6,7 @@ function execute(url) {
     url = url.replace("http://", "https://");
     Console.log("[CHAP] start: " + url);
 
-    // Cookie fetch only — no per-chapter WebView (fetchChapCF in config.js).
+    // /read/ → optional /txt/ fetchFast, else bounded WebView; never fetchFast on /read/ (hang risk).
     var doc = fetchChapCF(url);
 
     if (!doc) {

@@ -273,8 +273,38 @@ function ensureCfReady() {
     if (isCookieStale()) invalidateCookie();
     if (isCfProbeRecent() && loadCookie()) return true;
     if (probeCfSession()) return true;
-    invalidateCookie();
     return warmupCF();
+}
+
+function readToTxtUrl(url) {
+    url = (url || "").replace("http://", "https://");
+    var m = url.match(/\/read\/(\d+)\/(\d+)/);
+    if (m && m[1] && m[2]) {
+        return BASE_URL + "/txt/" + m[1] + "/" + m[2];
+    }
+    return "";
+}
+
+function waitForChapBrowser(browser, url, maxMs) {
+    var elapsed = 0;
+    var step = 250;
+    var limit = maxMs !== undefined ? maxMs : 8000;
+    var doc = null;
+    while (elapsed < limit) {
+        try { doc = browser.html(); } catch (e) { doc = null; }
+        if (doc && !isCfChallengeText(doc.text() + "") && isValid69shDoc(doc, url)) {
+            return doc;
+        }
+        sleep(step);
+        elapsed += step;
+    }
+    try {
+        doc = browser.html();
+        if (doc && !isCfChallengeText(doc.text() + "") && isValid69shDoc(doc, url)) {
+            return doc;
+        }
+    } catch (e2) {}
+    return null;
 }
 
 function fetchFast(url, skipInvalidate) {
@@ -309,7 +339,7 @@ function fetchFast(url, skipInvalidate) {
     return null;
 }
 
-// Bounded browser fetch for chapter pages (69shuba /read/ often needs WebView).
+// Bounded browser fetch for chapter pages (69shuba /read/ needs WebView; poll until #nr1).
 function fetchBrowserChap(url) {
     globalFetchWait();
     var browser = Engine.newBrowser();
@@ -318,13 +348,11 @@ function fetchBrowserChap(url) {
         browser.setUserAgent(UserAgent.android());
         browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
         browser.launch(url, 10000);
-        doc = waitForCfBrowser(browser, 8000);
-        if (doc && !isCfChallengeText(doc.text() + "") && isValid69shDoc(doc, url)) {
+        doc = waitForChapBrowser(browser, url, 8000);
+        if (doc) {
             extractCookiesFromBrowser(browser);
             markCfProbeOk();
             markGlobalFetch();
-        } else {
-            doc = null;
         }
     } finally {
         browser.close();
@@ -332,15 +360,27 @@ function fetchBrowserChap(url) {
     return doc;
 }
 
-// Chapter download: skip redundant warmup when cookie/probe fresh; fail fast on bad URLs.
+// Chapter download: skip fetchFast on /read/ (no timeout — can hang forever); try /txt/ fast path first.
 function fetchChapCF(url) {
     url = (url || "").replace("http://", "https://");
     if (!loadCookie()) {
         ensureCfReady();
-    } else if (!isCfProbeRecent() && !probeCfSession()) {
-        ensureCfReady();
     }
     globalFetchWait();
+
+    if (url.indexOf("/read/") >= 0) {
+        var txtUrl = readToTxtUrl(url);
+        if (txtUrl) {
+            var docTxt = fetchFast(txtUrl, true);
+            if (docTxt) {
+                Console.log("[69sh] chap txt fast ok");
+                return docTxt;
+            }
+        }
+        Console.log("[69sh] chap browser /read/");
+        return fetchBrowserChap(url);
+    }
+
     var doc = fetchFast(url, true);
     if (doc) return doc;
     sleep(500);
