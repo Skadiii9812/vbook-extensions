@@ -6,7 +6,7 @@ function execute(url) {
     url = url.replace("http://", "https://");
     Console.log("[CHAP] start: " + url);
 
-    // /read/ chapters: browser-only (no untimed fetch); bounded async WebView + batch recovery.
+    // /read/ chapters: browser-only (no untimed fetch); bounded sync launch + pre/post recovery.
     var doc = fetchChapCF(url);
 
     if (!doc) {

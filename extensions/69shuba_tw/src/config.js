@@ -292,6 +292,20 @@ function markChapBrowserUse() {
     return n;
 }
 
+function resetChapBrowserCount() {
+    try {
+        localStorage.setItem(_CHAP_BROWSER_N_KEY, "0");
+    } catch (e) {}
+}
+
+function chapBrowserRecoveryIfNeeded(nextN) {
+    if (nextN > 0 && nextN % 20 === 0) {
+        Console.log("[69sh] chap browser pre-recovery n=" + nextN);
+        sleep(4000);
+        resetChapBrowserCount();
+    }
+}
+
 function waitForChapBrowser(browser, url, maxMs) {
     var elapsed = 0;
     var step = 250;
@@ -346,9 +360,11 @@ function fetchFast(url, skipInvalidate) {
     return null;
 }
 
-// Async browser for /read/ chapters; poll until #nr1; periodic recovery for long batches.
+// Sync bounded browser for /read/ chapters; poll until #nr1; pre/post recovery every 20 uses.
 function fetchBrowserChap(url) {
     var t0 = Date.now();
+    var nextN = getChapBrowserCount() + 1;
+    chapBrowserRecoveryIfNeeded(nextN);
     var n = markChapBrowserUse();
     globalFetchWait();
     var browser = Engine.newBrowser();
@@ -356,8 +372,8 @@ function fetchBrowserChap(url) {
     try {
         browser.setUserAgent(UserAgent.android());
         browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
-        browser.launchAsync(url);
-        doc = waitForChapBrowser(browser, url, 10000);
+        browser.launch(url, 12000);
+        doc = waitForChapBrowser(browser, url, 8000);
         if (doc) {
             extractCookiesFromBrowser(browser);
             markCfProbeOk();
@@ -365,10 +381,10 @@ function fetchBrowserChap(url) {
         }
     } finally {
         try { browser.close(); } catch (e) {}
-        sleep(500);
-        if (n > 0 && n % 25 === 0) {
-            Console.log("[69sh] chap browser recovery n=" + n);
-            sleep(1500);
+        sleep(800);
+        if (nextN > 0 && nextN % 20 === 0) {
+            Console.log("[69sh] chap browser post-recovery n=" + nextN);
+            sleep(2000);
         }
     }
     Console.log("[69sh] chap browser n=" + n + " done ms=" + (Date.now() - t0));
