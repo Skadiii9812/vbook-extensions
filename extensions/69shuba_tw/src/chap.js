@@ -6,7 +6,7 @@ function execute(url) {
     url = url.replace("http://", "https://");
     Console.log("[CHAP] start: " + url);
 
-    // Referer cookie fetch on /read/, then bounded async WebView; never blocking fetch on /txt/.
+    // /read/ chapters: browser-only (no untimed fetch); bounded async WebView + batch recovery.
     var doc = fetchChapCF(url);
 
     if (!doc) {

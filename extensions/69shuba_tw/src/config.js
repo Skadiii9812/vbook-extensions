@@ -151,6 +151,7 @@ var _FETCH_MIN_MS_FLOOR = 500;
 var _LAST_FETCH_KEY = "69sh_last_fetch";
 var _DETAIL_CACHE_PREFIX = "69sh_detail_";
 var _DETAIL_CACHE_TTL_MS = 30 * 60 * 1000;
+var _CHAP_BROWSER_N_KEY = "69sh_chap_browser_n";
 
 function globalFetchWait() {
     var now = Date.now();
@@ -276,36 +277,19 @@ function ensureCfReady() {
     return warmupCF();
 }
 
-function fetchChapReadFast(url) {
-    url = (url || "").replace("http://", "https://");
-    if (url.indexOf("/read/") < 0) return null;
-    if (isCookieStale()) invalidateCookie();
-    var cookie = loadCookie();
-    if (!cookie) return null;
-    var bookMatch = url.match(/\/read\/(\d+)\/(\d+)/);
-    if (!bookMatch || !bookMatch[1]) return null;
-    var referer = BASE_URL + "/book/" + bookMatch[1] + "/";
-    globalFetchWait();
+function getChapBrowserCount() {
     try {
-        var res = fetch(url, {
-            headers: {
-                "User-Agent": _cfUA,
-                "Accept": "text/html",
-                "Accept-Language": "zh-TW,zh;q=0.9",
-                "Cookie": cookie,
-                "Referer": referer
-            }
-        });
-        if (res && res.ok) {
-            var doc = res.html();
-            if (doc && isValid69shDoc(doc, url)) {
-                markCfProbeOk();
-                markGlobalFetch();
-                return doc;
-            }
-        }
+        return parseInt(localStorage.getItem(_CHAP_BROWSER_N_KEY) || "0", 10);
     } catch (e) {}
-    return null;
+    return 0;
+}
+
+function markChapBrowserUse() {
+    var n = getChapBrowserCount() + 1;
+    try {
+        localStorage.setItem(_CHAP_BROWSER_N_KEY, String(n));
+    } catch (e) {}
+    return n;
 }
 
 function waitForChapBrowser(browser, url, maxMs) {
@@ -362,9 +346,10 @@ function fetchFast(url, skipInvalidate) {
     return null;
 }
 
-// Bounded async browser for /read/ chapters; poll until #nr1; sleep after close for WebView pool.
+// Async browser for /read/ chapters; poll until #nr1; periodic recovery for long batches.
 function fetchBrowserChap(url) {
     var t0 = Date.now();
+    var n = markChapBrowserUse();
     globalFetchWait();
     var browser = Engine.newBrowser();
     var doc = null;
@@ -380,13 +365,17 @@ function fetchBrowserChap(url) {
         }
     } finally {
         try { browser.close(); } catch (e) {}
-        sleep(300);
+        sleep(500);
+        if (n > 0 && n % 25 === 0) {
+            Console.log("[69sh] chap browser recovery n=" + n);
+            sleep(1500);
+        }
     }
-    Console.log("[69sh] chap browser done ms=" + (Date.now() - t0));
+    Console.log("[69sh] chap browser n=" + n + " done ms=" + (Date.now() - t0));
     return doc;
 }
 
-// Chapter download: Referer fetch on /read/ then async browser — never fetchFast on /txt/ or bare /read/.
+// Chapter download: browser-only for /read/ — no untimed fetch() in chap path.
 function fetchChapCF(url) {
     url = (url || "").replace("http://", "https://");
     if (!loadCookie()) {
@@ -395,11 +384,6 @@ function fetchChapCF(url) {
     globalFetchWait();
 
     if (url.indexOf("/read/") >= 0) {
-        var docRead = fetchChapReadFast(url);
-        if (docRead) {
-            Console.log("[69sh] chap read fast ok");
-            return docRead;
-        }
         Console.log("[69sh] chap browser /read/");
         return fetchBrowserChap(url);
     }
