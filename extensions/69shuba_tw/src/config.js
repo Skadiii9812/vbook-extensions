@@ -151,9 +151,6 @@ var _FETCH_MIN_MS_FLOOR = 500;
 var _LAST_FETCH_KEY = "69sh_last_fetch";
 var _DETAIL_CACHE_PREFIX = "69sh_detail_";
 var _DETAIL_CACHE_TTL_MS = 30 * 60 * 1000;
-var _CHAP_FETCH_OFF_PREFIX = "69sh_chap_fetch_off_";
-var _CHAP_BATCH_PREFIX = "69sh_chap_batch_";
-var _CHAP_BATCH_LIMIT = 25;
 
 function globalFetchWait() {
     var now = Date.now();
@@ -279,50 +276,6 @@ function ensureCfReady() {
     return warmupCF();
 }
 
-function getBookIdFromReadUrl(url) {
-    var m = (url || "").match(/\/read\/(\d+)\//);
-    if (m && m[1]) return m[1];
-    return "";
-}
-
-function isChapFetchDisabled(bookId) {
-    if (!bookId) return false;
-    try {
-        return (localStorage.getItem(_CHAP_FETCH_OFF_PREFIX + bookId) + "") === "1";
-    } catch (e) {}
-    return false;
-}
-
-function setChapFetchDisabled(bookId) {
-    if (!bookId) return;
-    try {
-        localStorage.setItem(_CHAP_FETCH_OFF_PREFIX + bookId, "1");
-    } catch (e) {}
-}
-
-function getChapBatchCount(bookId) {
-    if (!bookId) return 0;
-    try {
-        return parseInt(localStorage.getItem(_CHAP_BATCH_PREFIX + bookId) || "0", 10);
-    } catch (e) {}
-    return 0;
-}
-
-function resetChapBatchCount(bookId) {
-    if (!bookId) return;
-    try {
-        localStorage.setItem(_CHAP_BATCH_PREFIX + bookId, "0");
-    } catch (e) {}
-}
-
-function incrementChapBatchCount(bookId) {
-    if (!bookId) return;
-    var n = getChapBatchCount(bookId) + 1;
-    try {
-        localStorage.setItem(_CHAP_BATCH_PREFIX + bookId, String(n));
-    } catch (e) {}
-}
-
 function waitForChapBrowser(browser, url, maxMs) {
     var elapsed = 0;
     var step = 250;
@@ -409,7 +362,7 @@ function fetchChapReadFast(url) {
     return null;
 }
 
-// Async browser on /read/; no block(); v16-style sleep.
+// Async browser for /read/ chapters; poll until #nr1.
 function fetchBrowserChap(url) {
     var t0 = Date.now();
     globalFetchWait();
@@ -417,6 +370,7 @@ function fetchBrowserChap(url) {
     var doc = null;
     try {
         browser.setUserAgent(UserAgent.android());
+        browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
         browser.launchAsync(url);
         doc = waitForChapBrowser(browser, url, 10000);
         if (doc) {
@@ -432,7 +386,7 @@ function fetchBrowserChap(url) {
     return doc;
 }
 
-// Chapter download: v16 fetch→browser; per-book fetch disable; silent batch cooldown every 25.
+// Chapter download: fetchChapReadFast → fetchBrowserChap for /read/ (v16).
 function fetchChapCF(url) {
     url = (url || "").replace("http://", "https://");
     if (!loadCookie()) {
@@ -441,24 +395,8 @@ function fetchChapCF(url) {
     globalFetchWait();
 
     if (url.indexOf("/read/") >= 0) {
-        var bookId = getBookIdFromReadUrl(url);
-        if (bookId) {
-            if (getChapBatchCount(bookId) >= _CHAP_BATCH_LIMIT) {
-                Console.log("[69sh] chap batch cooldown bookId=" + bookId);
-                sleep(6000);
-                resetChapBatchCount(bookId);
-            }
-            incrementChapBatchCount(bookId);
-        }
-        if (!isChapFetchDisabled(bookId)) {
-            var docRead = fetchChapReadFast(url);
-            if (docRead) {
-                Console.log("[69sh] readFast=True");
-                return docRead;
-            }
-            if (bookId) setChapFetchDisabled(bookId);
-            Console.log("[69sh] readFast=False fetchOff bookId=" + bookId);
-        }
+        var docRead = fetchChapReadFast(url);
+        if (docRead) return docRead;
         return fetchBrowserChap(url);
     }
 
