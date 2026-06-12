@@ -6,7 +6,7 @@ function execute(url) {
     url = url.replace("http://", "https://");
     Console.log("[CHAP] start: " + url);
 
-    // /read/ chapters: browser-only (no untimed fetch); bounded sync launch + pre/post recovery.
+    // /read/ chapters: v16 fetch→browser; per-book fetch disable; silent batch cooldown.
     var doc = fetchChapCF(url);
 
     if (!doc) {
