@@ -6,8 +6,6 @@ try {
 } catch (e) {}
 
 // ============ Asset Blocking Lists ============
-// _BLOCK_ADS: ad networks confirmed from 69shuba_tw device testing.
-// cn.macacusdame.com confirmed in chap.js device output. Add more as discovered.
 var _BLOCK_ADS = [
     "cn.macacusdame.com",
     "googletagmanager",
@@ -15,27 +13,19 @@ var _BLOCK_ADS = [
     "cloudflareinsights"
 ];
 
-// _BLOCK_HEAVY: generic static assets — not needed for HTML content parsing.
-// Blocking these speeds up all browser sessions significantly.
 var _BLOCK_HEAVY = [
     ".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg",
     ".css", ".woff", ".woff2", ".ttf", ".eot"
 ];
 
-// ============ Cloudflare Cookie System ============
+// ============ Cloudflare Cookie Session (only cache we keep) ============
 var _cfCookie = null;
 var _cfUA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
-var _cfReady = false;
-var _HOMEPAGE_URL = BASE_URL + "/";
 var _CF_COOKIE_KEY = "69sh_cf";
 var _CF_COOKIE_TS_KEY = "69sh_cf_ts";
-var _CF_PROBE_TS_KEY = "69sh_cf_probe_ts";
-var _CF_COOKIE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
-var _CF_PROBE_MAX_AGE_MS = 30 * 60 * 1000;
-var _LAST_INDEX_OK_KEY = "69sh_last_index_ok_ts";
-var _INDEX_OK_MAX_AGE_MS = 30 * 60 * 1000;
-var _DETAIL_SYNC_PREFIX = "69sh_detail_sync_ts_";
-var _DETAIL_SYNC_TTL_MS = 5 * 60 * 1000;
+var _GLOBAL_FETCH_MIN_MS = 400;
+var _LAST_ANY_FETCH_KEY = "69sh_last_any_fetch";
+var _CF_ERR = "Cloudflare session missing — open 69shuba.tw in app browser once";
 
 function isCfChallengeText(t) {
     t = (t || "") + "";
@@ -66,42 +56,9 @@ function isValid69shDoc(doc, url) {
     return title.indexOf("69\u66f8\u5427") >= 0 || t.indexOf("69\u66f8\u5427") >= 0;
 }
 
-function isCookieStale() {
-    try {
-        var ts = parseInt(localStorage.getItem(_CF_COOKIE_TS_KEY) || "0", 10);
-        if (!ts) return !loadCookie();
-        return (Date.now() - ts) > _CF_COOKIE_MAX_AGE_MS;
-    } catch (e) {}
-    return false;
-}
-
-function markCfProbeOk() {
-    _cfReady = true;
-    try { localStorage.setItem(_CF_PROBE_TS_KEY, String(Date.now())); } catch (e) {}
-}
-
-function isCfProbeRecent() {
-    try {
-        var ts = parseInt(localStorage.getItem(_CF_PROBE_TS_KEY) || "0", 10);
-        return ts > 0 && (Date.now() - ts) < _CF_PROBE_MAX_AGE_MS;
-    } catch (e) {}
-    return false;
-}
-
-function markIndexFetchOk() {
-    try { localStorage.setItem(_LAST_INDEX_OK_KEY, String(Date.now())); } catch (e) {}
-}
-
-function isIndexFetchRecent() {
-    try {
-        var ts = parseInt(localStorage.getItem(_LAST_INDEX_OK_KEY) || "0", 10);
-        return ts > 0 && (Date.now() - ts) < _INDEX_OK_MAX_AGE_MS;
-    } catch (e) {}
-    return false;
-}
-
 function loadCookie() {
     if (_cfCookie) return _cfCookie;
+    // Prefer localCookie — shares HttpOnly cf_clearance with app / WebView jar
     try {
         var lc = localCookie.getCookie() + "";
         if (lc && lc.length > 10) { _cfCookie = lc; return _cfCookie; }
@@ -116,7 +73,6 @@ function loadCookie() {
 function storeCookie(cookie) {
     if (!cookie || cookie.length < 5) return;
     _cfCookie = cookie;
-    _cfReady = true;
     try {
         localStorage.setItem(_CF_COOKIE_KEY, cookie);
         localStorage.setItem(_CF_COOKIE_TS_KEY, String(Date.now()));
@@ -132,25 +88,15 @@ function storeCookie(cookie) {
 
 function invalidateCookie() {
     _cfCookie = null;
-    _cfReady = false;
     try {
         localStorage.removeItem(_CF_COOKIE_KEY);
         localStorage.removeItem(_CF_COOKIE_TS_KEY);
-        localStorage.removeItem(_CF_PROBE_TS_KEY);
     } catch (e) {}
-    setThrottleColdFor(_THROTTLE_COLD_MS);
 }
 
-var _GLOBAL_FETCH_MIN_MS = 400;
-var _LAST_ANY_FETCH_KEY = "69sh_last_any_fetch";
-var _THROTTLE_COLD_UNTIL_KEY = "69sh_throttle_cold_until";
-var _THROTTLE_COLD_MS = 5 * 60 * 1000;
-var _FETCH_MIN_MS_HOT = 750;
-var _FETCH_MIN_MS_COLD = 1000;
-var _FETCH_MIN_MS_FLOOR = 500;
-var _LAST_FETCH_KEY = "69sh_last_fetch";
-var _DETAIL_CACHE_PREFIX = "69sh_detail_";
-var _DETAIL_CACHE_TTL_MS = 30 * 60 * 1000;
+function cfSessionError() {
+    return Response.error(_CF_ERR);
+}
 
 function globalFetchWait() {
     var now = Date.now();
@@ -170,52 +116,86 @@ function markGlobalFetch() {
     } catch (e) {}
 }
 
-function isThrottleColdForced() {
-    try {
-        var until = parseInt(localStorage.getItem(_THROTTLE_COLD_UNTIL_KEY) || "0", 10);
-        return until > 0 && Date.now() < until;
-    } catch (e) {}
-    return false;
-}
-
-function setThrottleColdFor(ms) {
-    try {
-        localStorage.setItem(_THROTTLE_COLD_UNTIL_KEY, String(Date.now() + ms));
-    } catch (e) {}
-}
-
-function getFetchMinMs() {
-    var minMs = _FETCH_MIN_MS_COLD;
-    if (!isThrottleColdForced() && isCfProbeRecent() && loadCookie()) {
-        minMs = _FETCH_MIN_MS_HOT;
-    }
-    if (minMs < _FETCH_MIN_MS_FLOOR) minMs = _FETCH_MIN_MS_FLOOR;
-    return minMs;
-}
-
-function handleCfStress() {
-    invalidateCookie();
-    setThrottleColdFor(_THROTTLE_COLD_MS);
-}
-
 function extractCookiesFromBrowser(browser) {
     var cookie = "";
-    try {
-        browser.callJs("window._69shc = document.cookie;", 300);
-        cookie = browser.getVariable("_69shc") + "";
-    } catch (e) {}
+    // Prefer localCookie (HttpOnly cf_clearance) over document.cookie
+    try { cookie = localCookie.getCookie() + ""; } catch (e) {}
     if (!cookie || cookie.length < 10) {
-        try { cookie = localCookie.getCookie() + ""; } catch (e) {}
+        try {
+            browser.callJs("window._69shc = document.cookie;", 300);
+            cookie = browser.getVariable("_69shc") + "";
+        } catch (e2) {}
     }
     if (cookie && cookie.length > 5) {
         storeCookie(cookie);
     }
 }
 
+function harvestCookieAfterBrowser() {
+    try {
+        var lc = localCookie.getCookie() + "";
+        if (lc && lc.length > 10) storeCookie(lc);
+    } catch (e) {}
+}
+
+function buildFetchHeaders(extra) {
+    var headers = {
+        "User-Agent": _cfUA,
+        "Accept": "text/html",
+        "Accept-Language": "zh-TW,zh;q=0.9"
+    };
+    var cookie = loadCookie();
+    if (cookie) headers["Cookie"] = cookie;
+    if (extra) {
+        for (var k in extra) {
+            if (extra.hasOwnProperty(k)) headers[k] = extra[k];
+        }
+    }
+    return headers;
+}
+
+// Always try fetch (CF assumed ready after user opens app browser).
+// Only fail when response is a CF challenge / invalid doc.
+function fetchFast(url, extraHeaders) {
+    globalFetchWait();
+    try {
+        var res = fetch(url, { headers: buildFetchHeaders(extraHeaders) });
+        if (res && res.ok) {
+            var doc = res.html();
+            if (doc && isValid69shDoc(doc, url)) {
+                markGlobalFetch();
+                return doc;
+            }
+            if (doc && isCfChallengeText(doc.text() + "")) {
+                invalidateCookie();
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
+function fetchChapReadFast(url) {
+    url = (url || "").replace("http://", "https://");
+    if (url.indexOf("/read/") < 0) return null;
+    var bookMatch = url.match(/\/read\/(\d+)\/(\d+)/);
+    if (!bookMatch || !bookMatch[1]) return null;
+    var referer = BASE_URL + "/book/" + bookMatch[1] + "/";
+    return fetchFast(url, { "Referer": referer });
+}
+
+// Fetch-only chapter path — no WebView.
+function fetchChapCF(url) {
+    url = (url || "").replace("http://", "https://");
+    if (url.indexOf("/read/") >= 0) {
+        return fetchChapReadFast(url);
+    }
+    return fetchFast(url);
+}
+
 function waitForCfBrowser(browser, maxMs) {
     var elapsed = 0;
     var step = 250;
-    var limit = maxMs !== undefined ? maxMs : 20000;
+    var limit = maxMs !== undefined ? maxMs : 12000;
     var doc = null;
     while (elapsed < limit) {
         try { doc = browser.html(); } catch (e) { doc = null; }
@@ -232,256 +212,49 @@ function waitForCfBrowser(browser, maxMs) {
     return doc;
 }
 
-function probeCfSession() {
-    if (isCookieStale()) {
-        invalidateCookie();
-        return false;
-    }
-    if (!loadCookie()) return false;
-    globalFetchWait();
-    var doc = fetchFast(_HOMEPAGE_URL, true);
-    if (doc && isValid69shDoc(doc, _HOMEPAGE_URL)) {
-        markCfProbeOk();
-        markGlobalFetch();
-        Console.log("[69sh] probe ok");
-        return true;
-    }
-    Console.log("[69sh] probe fail");
-    setThrottleColdFor(_THROTTLE_COLD_MS);
-    return false;
-}
-
-function warmupCF() {
-    if (probeCfSession()) return true;
-
-    Console.log("[69sh] warmup browser");
-    var browser = Engine.newBrowser();
-    try {
-        browser.setUserAgent(UserAgent.android());
-        browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
-        browser.launch(_HOMEPAGE_URL, 15000);
-        waitForCfBrowser(browser, 20000);
-        extractCookiesFromBrowser(browser);
-    } finally {
-        browser.close();
-    }
-    _cfReady = probeCfSession();
-    return _cfReady;
-}
-
-function ensureCfReady() {
-    if (isCookieStale()) invalidateCookie();
-    if (isCfProbeRecent() && loadCookie()) return true;
-    if (probeCfSession()) return true;
-    return warmupCF();
-}
-
-function waitForChapBrowser(browser, url, maxMs) {
-    var elapsed = 0;
-    var step = 250;
-    var limit = maxMs !== undefined ? maxMs : 8000;
-    var doc = null;
-    while (elapsed < limit) {
-        try { doc = browser.html(); } catch (e) { doc = null; }
-        if (doc && !isCfChallengeText(doc.text() + "") && isValid69shDoc(doc, url)) {
-            return doc;
-        }
-        sleep(step);
-        elapsed += step;
-    }
-    try {
-        doc = browser.html();
-        if (doc && !isCfChallengeText(doc.text() + "") && isValid69shDoc(doc, url)) {
-            return doc;
-        }
-    } catch (e2) {}
-    return null;
-}
-
-function fetchFast(url, skipInvalidate) {
-    if (isCookieStale()) invalidateCookie();
-    var cookie = loadCookie();
-    if (!cookie) return null;
-    globalFetchWait();
-    try {
-        var res = fetch(url, {
-            headers: {
-                "User-Agent": _cfUA,
-                "Accept": "text/html",
-                "Accept-Language": "zh-TW,zh;q=0.9",
-                "Cookie": cookie
-            }
-        });
-        if (res && res.ok) {
-            var doc = res.html();
-            if (doc && isValid69shDoc(doc, url)) {
-                markCfProbeOk();
-                markGlobalFetch();
-                if (url.indexOf("/indexlist/") >= 0 || url.indexOf("/book/") >= 0) {
-                    markIndexFetchOk();
-                }
-                return doc;
-            }
-            if (doc && isCfChallengeText(doc.text() + "")) {
-                if (!skipInvalidate) handleCfStress();
-            }
-        }
-    } catch (e) {}
-    return null;
-}
-
-function fetchChapReadFast(url) {
-    url = (url || "").replace("http://", "https://");
-    if (url.indexOf("/read/") < 0) return null;
-    if (isCookieStale()) invalidateCookie();
-    var cookie = loadCookie();
-    if (!cookie) return null;
-    var bookMatch = url.match(/\/read\/(\d+)\/(\d+)/);
-    if (!bookMatch || !bookMatch[1]) return null;
-    var referer = BASE_URL + "/book/" + bookMatch[1] + "/";
-    globalFetchWait();
-    try {
-        var res = fetch(url, {
-            headers: {
-                "User-Agent": _cfUA,
-                "Accept": "text/html",
-                "Accept-Language": "zh-TW,zh;q=0.9",
-                "Cookie": cookie,
-                "Referer": referer
-            }
-        });
-        if (res && res.ok) {
-            var doc = res.html();
-            if (doc && isValid69shDoc(doc, url)) {
-                markCfProbeOk();
-                markGlobalFetch();
-                return doc;
-            }
-        }
-    } catch (e) {}
-    return null;
-}
-
-// Async browser for /read/ chapters; poll until #nr1.
-function fetchBrowserChap(url) {
-    var t0 = Date.now();
-    globalFetchWait();
-    var browser = Engine.newBrowser();
-    var doc = null;
-    try {
-        browser.setUserAgent(UserAgent.android());
-        browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
-        browser.launchAsync(url);
-        doc = waitForChapBrowser(browser, url, 10000);
-        if (doc) {
-            extractCookiesFromBrowser(browser);
-            markCfProbeOk();
-            markGlobalFetch();
-        }
-    } finally {
-        try { browser.close(); } catch (e) {}
-        sleep(300);
-    }
-    Console.log("[69sh] chap browser done ms=" + (Date.now() - t0));
-    return doc;
-}
-
-// Chapter download: fetchChapReadFast → fetchBrowserChap for /read/ (v16).
-function fetchChapCF(url) {
-    url = (url || "").replace("http://", "https://");
-    if (!loadCookie()) {
-        ensureCfReady();
-    }
-    globalFetchWait();
-
-    if (url.indexOf("/read/") >= 0) {
-        var docRead = fetchChapReadFast(url);
-        if (docRead) return docRead;
-        return fetchBrowserChap(url);
-    }
-
-    var doc = fetchFast(url, true);
-    if (doc) return doc;
-    sleep(500);
-    doc = fetchFast(url, true);
-    if (doc) return doc;
-    return fetchBrowserChap(url);
-}
-
+// Browser fallback for detail/page/toc only (not chap). Needed when fetch gets 403
+// because Engine/WebView cookies often do not sync into localCookie for fetch().
 function fetchBrowserCF(url, timeout) {
-    var t = timeout !== undefined ? timeout : 15000;
+    var t = timeout !== undefined ? timeout : 12000;
     globalFetchWait();
+    Console.log("[69sh] browser fallback url=" + url);
     var browser = Engine.newBrowser();
     var doc = null;
     try {
         browser.setUserAgent(UserAgent.android());
         browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
         browser.launch(url, t);
-        doc = waitForCfBrowser(browser, 20000);
-        if (doc && !isCfChallengeText(doc.text() + "")) {
+        doc = waitForCfBrowser(browser, 12000);
+        if (doc && !isCfChallengeText(doc.text() + "") && isValid69shDoc(doc, url)) {
             extractCookiesFromBrowser(browser);
-            markCfProbeOk();
             markGlobalFetch();
-            if (url.indexOf("/indexlist/") >= 0 || url.indexOf("/book/") >= 0) {
-                markIndexFetchOk();
-            }
         } else {
             doc = null;
-            handleCfStress();
         }
     } finally {
-        browser.close();
+        try { browser.close(); } catch (e) {}
+        harvestCookieAfterBrowser();
     }
     return doc;
 }
 
 function fetchCFOnce(url) {
     url = (url || "").replace("http://", "https://");
-    var doc = fetchFast(url);
+    var doc = null;
+    if (url.indexOf("/indexlist/") >= 0) {
+        var m = url.match(/\/indexlist\/(\d+)/);
+        if (m && m[1]) {
+            doc = fetchFast(url, { "Referer": BASE_URL + "/book/" + m[1] + "/" });
+            if (doc) return doc;
+        }
+    }
+    doc = fetchFast(url);
     if (doc) return doc;
-    doc = fetchBrowserCF(url);
-    if (doc && isValid69shDoc(doc, url)) return doc;
-    return null;
+    return fetchBrowserCF(url);
 }
 
 function fetchCF(url) {
-    url = (url || "").replace("http://", "https://");
-    ensureCfReady();
     return fetchCFOnce(url);
-}
-
-function canUseTocCache() {
-    if (!loadCookie() || isCookieStale()) return false;
-    return isCfProbeRecent() || isIndexFetchRecent();
-}
-
-// ============ Throttled fetch (TOC pagination / burst calls) ============
-function throttleWait() {
-    var minMs = getFetchMinMs();
-    Console.log("[69sh] throttle " + minMs + "ms" + (minMs === _FETCH_MIN_MS_HOT ? " hot" : " cold"));
-    var now = Date.now();
-    var last = 0;
-    try {
-        last = parseInt(localStorage.getItem(_LAST_FETCH_KEY) || "0", 10);
-    } catch (e) {}
-    var gap = now - last;
-    if (gap < minMs) {
-        sleep(minMs - gap);
-    }
-}
-
-function markFetch() {
-    try {
-        localStorage.setItem(_LAST_FETCH_KEY, String(Date.now()));
-    } catch (e) {}
-}
-
-function fetchCFThrottled(url) {
-    throttleWait();
-    ensureCfReady();
-    var doc = fetchCFOnce(url);
-    markFetch();
-    return doc;
 }
 
 // ============ Indexlist URL + parsing helpers ============
@@ -574,230 +347,4 @@ function parseChapterList(doc, host) {
         }
     }
     return list;
-}
-
-// ============ TOC page cache (auto-check) ============
-var _TOC_CACHE_PREFIX = "69sh_toc_";
-var _PAGE_LIST_PREFIX = "69sh_pages_";
-var _UPDATE_TIME_PREFIX = "69sh_ut_";
-
-function getTocCacheKey(indexUrl) {
-    var m = (indexUrl || "").match(/\/indexlist\/(\d+)\/?(\d*)/);
-    if (m) {
-        return m[1] + "_p" + (m[2] || "1");
-    }
-    return (indexUrl || "").replace(/[^a-zA-Z0-9]/g, "_");
-}
-
-function getTocPageCache(indexUrl) {
-    try {
-        var raw = localStorage.getItem(_TOC_CACHE_PREFIX + getTocCacheKey(indexUrl));
-        if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return null;
-}
-
-function setTocPageCache(indexUrl, chapters) {
-    if (!chapters || chapters.length === 0) return;
-    var cacheKey = getTocCacheKey(indexUrl);
-    var bookId = cacheKey.split("_p")[0];
-    var updateTime = "";
-    try { updateTime = localStorage.getItem(_UPDATE_TIME_PREFIX + bookId) + ""; } catch (e) {}
-    try {
-        localStorage.setItem(_TOC_CACHE_PREFIX + cacheKey, JSON.stringify({
-            chapters: chapters,
-            updateTime: updateTime,
-            ts: Date.now()
-        }));
-    } catch (e) {}
-}
-
-function invalidatePageListCache(bookId) {
-    if (!bookId) return;
-    try { localStorage.removeItem(_PAGE_LIST_PREFIX + bookId); } catch (e) {}
-}
-
-function getPageListCache(bookId) {
-    if (!bookId) return null;
-    try {
-        var raw = localStorage.getItem(_PAGE_LIST_PREFIX + bookId);
-        if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return null;
-}
-
-function setPageListCache(bookId, pageUrls) {
-    if (!bookId || !pageUrls || pageUrls.length === 0) return;
-    var updateTime = getBookUpdateTime(bookId);
-    try {
-        localStorage.setItem(_PAGE_LIST_PREFIX + bookId, JSON.stringify({
-            pageUrls: pageUrls,
-            updateTime: updateTime,
-            ts: Date.now()
-        }));
-    } catch (e) {}
-}
-
-function invalidateTocCache(bookId) {
-    if (!bookId) return;
-    invalidatePageListCache(bookId);
-    for (var p = 1; p <= 20; p++) {
-        try { localStorage.removeItem(_TOC_CACHE_PREFIX + bookId + "_p" + p); } catch (e) {}
-    }
-}
-
-function invalidateDetailCache(bookId) {
-    if (!bookId) return;
-    try { localStorage.removeItem(_DETAIL_CACHE_PREFIX + bookId); } catch (e) {}
-}
-
-function getDetailCache(bookId) {
-    if (!bookId) return null;
-    try {
-        var raw = localStorage.getItem(_DETAIL_CACHE_PREFIX + bookId);
-        if (!raw) return null;
-        var cached = JSON.parse(raw);
-        if (!cached || !cached.ts) return null;
-        if ((Date.now() - cached.ts) > _DETAIL_CACHE_TTL_MS) return null;
-        return cached;
-    } catch (e) {}
-    return null;
-}
-
-function setDetailCache(bookId, payload) {
-    if (!bookId || !payload) return;
-    try {
-        payload.ts = Date.now();
-        localStorage.setItem(_DETAIL_CACHE_PREFIX + bookId, JSON.stringify(payload));
-    } catch (e) {}
-}
-
-function syncTocCacheValidity(bookId, updateTime) {
-    if (!bookId || !updateTime) return;
-    try {
-        var key = _UPDATE_TIME_PREFIX + bookId;
-        var prev = localStorage.getItem(key) + "";
-        if (prev && prev !== updateTime) {
-            invalidateTocCache(bookId);
-            invalidateDetailCache(bookId);
-            invalidatePageListCache(bookId);
-        }
-        localStorage.setItem(key, updateTime);
-    } catch (e) {}
-}
-
-function getBookUpdateTime(bookId) {
-    if (!bookId) return "";
-    try {
-        return localStorage.getItem(_UPDATE_TIME_PREFIX + bookId) + "";
-    } catch (e) {}
-    return "";
-}
-
-function markBookDetailSynced(bookId, updateTime) {
-    if (!bookId) return;
-    try { localStorage.setItem(_DETAIL_SYNC_PREFIX + bookId, String(Date.now())); } catch (e) {}
-    if (updateTime) syncTocCacheValidity(bookId, updateTime);
-}
-
-function shouldSkipDetailRefresh(bookId) {
-    if (!bookId) return false;
-    var ut = getBookUpdateTime(bookId);
-    if (!ut) return false;
-    try {
-        var ts = parseInt(localStorage.getItem(_DETAIL_SYNC_PREFIX + bookId) || "0", 10);
-        return ts > 0 && (Date.now() - ts) < _DETAIL_SYNC_TTL_MS;
-    } catch (e) {}
-    return false;
-}
-
-function readUpdateTimeFromDoc(doc, bookUrl) {
-    if (!doc) return "";
-    var updateTime = doc.select('meta[property="og:novel:update_time"]').attr("content") + "";
-    var bookIdMatch = (bookUrl || "").match(/\/book\/(\d+)/);
-    if (bookIdMatch && bookIdMatch[1] && updateTime) {
-        markBookDetailSynced(bookIdMatch[1], updateTime);
-    }
-    return updateTime;
-}
-
-function fetchBookUpdateTimeOnce(bookUrl) {
-    bookUrl = (bookUrl || "").replace("http://", "https://");
-    var doc = fetchCFOnce(bookUrl);
-    return readUpdateTimeFromDoc(doc, bookUrl);
-}
-
-function fetchBookUpdateTime(bookUrl) {
-    bookUrl = (bookUrl || "").replace("http://", "https://");
-    var doc = fetchCF(bookUrl);
-    return readUpdateTimeFromDoc(doc, bookUrl);
-}
-
-function ensureTocCacheFresh(bookUrl, forceCheck, cfReady) {
-    bookUrl = (bookUrl || "").replace("http://", "https://");
-    var bookIdMatch = bookUrl.match(/\/book\/(\d+)/);
-    if (!bookIdMatch || !bookIdMatch[1]) return;
-    var bookId = bookIdMatch[1];
-    if (!forceCheck && shouldSkipDetailRefresh(bookId)) {
-        Console.log("[69sh] ensureTocCacheFresh skip bookId=" + bookId);
-        return;
-    }
-    var updateTime = cfReady ? fetchBookUpdateTimeOnce(bookUrl) : fetchBookUpdateTime(bookUrl);
-    if (updateTime) {
-        syncTocCacheValidity(bookId, updateTime);
-    }
-}
-
-function isIndexlistPageOne(indexUrl) {
-    var m = (indexUrl || "").match(/\/indexlist\/(\d+)\/?(\d*)/);
-    if (!m) return false;
-    var pageNum = m[2] || "";
-    return pageNum === "" || pageNum === "1";
-}
-
-var _PREWARM_MAX_PAGES = 12;
-
-function warmIndexlistFromDetail(bookId) {
-    if (!bookId) return;
-    var indexUrl = BASE_URL + "/indexlist/" + bookId + "/";
-    var ut = getBookUpdateTime(bookId);
-    var cached = getTocPageCache(indexUrl);
-    if (cached && cached.chapters && cached.chapters.length > 0 && ut && cached.updateTime === ut) {
-        var pages = getPageListCache(bookId);
-        if (pages && pages.pageUrls && pages.pageUrls.length > 0) return;
-    }
-    var doc = fetchCFOnce(indexUrl);
-    if (!doc || !isValidIndexDoc(doc)) return;
-    var pageList = parseIndexPages(doc, indexUrl);
-    if (pageList.length > 0) setPageListCache(bookId, pageList);
-    var list = parseChapterList(doc, BASE_URL);
-    if (list.length > 0) {
-        setTocPageCache(indexUrl, list);
-        Console.log("[69sh] detail warm index p1 chapters=" + list.length);
-    }
-}
-
-function prewarmTocPagesForUpdate(bookId, pageList) {
-    if (!bookId || !pageList || pageList.length === 0) return;
-    if (!shouldSkipDetailRefresh(bookId)) return;
-    var ut = getBookUpdateTime(bookId);
-    var max = pageList.length;
-    if (max > _PREWARM_MAX_PAGES) max = _PREWARM_MAX_PAGES;
-    var warmed = 0;
-    for (var i = 0; i < max; i++) {
-        var pageUrl = pageList[i];
-        var cached = getTocPageCache(pageUrl);
-        if (cached && cached.chapters && cached.chapters.length > 0 && ut && cached.updateTime === ut) {
-            continue;
-        }
-        var doc = fetchCFOnce(pageUrl);
-        if (!doc || !isValidIndexDoc(doc)) continue;
-        var list = parseChapterList(doc, BASE_URL);
-        if (list.length === 0) continue;
-        setTocPageCache(pageUrl, list);
-        warmed++;
-    }
-    if (warmed > 0) {
-        Console.log("[PAGE] prewarm toc pages=" + warmed);
-    }
 }

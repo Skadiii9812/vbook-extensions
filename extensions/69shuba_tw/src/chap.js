@@ -6,7 +6,7 @@ function execute(url) {
     url = url.replace("http://", "https://");
     Console.log("[CHAP] start: " + url);
 
-    // /read/ chapters: fetchChapReadFast → fetchBrowserChap (v16).
+    // Fetch-only (no WebView) — CF from app browser cookie jar.
     var doc = fetchChapCF(url);
 
     if (!doc) {

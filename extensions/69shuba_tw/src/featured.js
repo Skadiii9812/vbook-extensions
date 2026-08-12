@@ -18,24 +18,27 @@ function execute(url) {
     Console.log("[FEATURED] Launching: " + url);
 
     var browser = Engine.newBrowser();
-    browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
-    browser.launchAsync(url);
+    var doc = null;
+    try {
+        browser.block(_BLOCK_ADS.concat(_BLOCK_HEAVY));
+        browser.launchAsync(url);
 
-    var doc;
-    for (var i = 0; i < 30; i++) {
-        sleep(250);
-        doc = browser.html();
-        if (doc && doc.select("div.s_m").size() > 0) {
-            Console.log("[FEATURED] Content loaded at attempt " + i);
-            break;
+        for (var i = 0; i < 30; i++) {
+            sleep(250);
+            doc = browser.html();
+            if (doc && doc.select("div.s_m").size() > 0) {
+                Console.log("[FEATURED] Content loaded at attempt " + i);
+                break;
+            }
         }
+        extractCookiesFromBrowser(browser);
+    } finally {
+        try { browser.close(); } catch (e) {}
+        harvestCookieAfterBrowser();
+        sleep(1500); // Allow WebView to fully release before next browser session
     }
-    extractCookiesFromBrowser(browser);
-    browser.close();
-    sleep(1500); // Allow WebView to fully release before next browser session (toc.js)
 
     if (!doc) return Response.error("Failed to load homepage");
-
 
     var list = [];
 
@@ -59,7 +62,7 @@ function execute(url) {
             if (titleEl) {
                 var name = titleEl.text().trim() + "";
                 var link = (titleEl.attr("href") || "") + "";
-                if (link && link.startsWith("/")) link = "https://69shuba.tw" + link;
+                if (link && link.indexOf("/") === 0) link = BASE_URL + link;
 
                 if (name && link) {
                     list.push({
@@ -67,7 +70,7 @@ function execute(url) {
                         link: link,
                         cover: getCoverFromLink(link),
                         description: "",
-                        host: "https://69shuba.tw"
+                        host: BASE_URL
                     });
                 }
             }
@@ -82,7 +85,7 @@ function execute(url) {
 
             var itemName = linkEl.text().trim() + "";
             var itemLink = (linkEl.attr("href") || "") + "";
-            if (itemLink && itemLink.startsWith("/")) itemLink = "https://69shuba.tw" + itemLink;
+            if (itemLink && itemLink.indexOf("/") === 0) itemLink = BASE_URL + itemLink;
 
             if (itemName && itemLink) {
                 list.push({
@@ -90,7 +93,7 @@ function execute(url) {
                     link: itemLink,
                     cover: getCoverFromLink(itemLink),
                     description: "",
-                    host: "https://69shuba.tw"
+                    host: BASE_URL
                 });
             }
         }
@@ -98,6 +101,5 @@ function execute(url) {
 
     if (list.length === 0) return Response.error("No featured items found");
 
-    // No pagination for editorial section
     return Response.success(list, null);
 }
