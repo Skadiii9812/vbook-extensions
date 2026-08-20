@@ -29,10 +29,12 @@ var _CF_ERR = "Cloudflare session missing — open 69shuba.tw in app browser onc
 
 function isCfChallengeText(t) {
     t = (t || "") + "";
-    if (t.length < 200) return true;
     if (t.indexOf("Just a moment") >= 0) return true;
     if (t.indexOf("Please complete human verification") >= 0) return true;
     if (t.indexOf("Verify you are human") >= 0) return true;
+    // Short last indexlist pages are real (e.g. 2 chapters, tlen~180) and contain 69書吧.
+    // Only treat tiny bodies as CF when they look like a blank/challenge page.
+    if (t.length < 200 && t.indexOf("69書吧") === -1 && t.indexOf("章節目錄") === -1) return true;
     return false;
 }
 
@@ -274,7 +276,9 @@ function isValidIndexDoc(doc) {
     if (!title || title.indexOf("69書吧") === -1) return false;
     var listItems = doc.select("#catalog ul li");
     if (listItems.size() === 0) listItems = doc.select("li");
-    return listItems.size() > 0;
+    if (listItems.size() > 0) return true;
+    // Last index pages can omit #catalog and only keep a[href*=/read/]
+    return doc.select('a[href*="/read/"]').size() > 0;
 }
 
 function parseIndexPages(doc, indexUrl) {
@@ -309,6 +313,21 @@ function parseChapterList(doc, host) {
         if (backMatch && backMatch[1]) bookTitle = backMatch[1];
     }
 
+    var pushChap = function(name, link) {
+        if (!link || link.length === 0) return;
+        if (link.indexOf("javascript:") === 0) return;
+        if (link.indexOf("/") === 0) link = host + link;
+        if (name) {
+            if (bookTitle && name.indexOf(bookTitle) !== -1) {
+                name = name.replace(bookTitle, "").trim();
+            }
+            name = name.trim();
+        } else {
+            name = "Chapter " + (list.length + 1);
+        }
+        list.push({ name: name, url: link, host: host });
+    };
+
     for (var i = 0; i < listItems.size(); i++) {
         var li = listItems.get(i);
         var className = li.attr("class") + "";
@@ -333,17 +352,15 @@ function parseChapterList(doc, host) {
             }
         }
 
-        if (link && link.length > 0) {
-            if (link.indexOf("/") === 0) link = host + link;
-            if (name) {
-                if (bookTitle && name.indexOf(bookTitle) !== -1) {
-                    name = name.replace(bookTitle, "").trim();
-                }
-                name = name.trim();
-            } else {
-                name = "Chapter " + (list.length + 1);
-            }
-            list.push({ name: name, url: link, host: host });
+        pushChap(name, link);
+    }
+
+    // Last index pages omit #catalog; chapters are bare a[href*=/read/]
+    if (list.length === 0) {
+        var readLinks = doc.select('a[href*="/read/"]');
+        for (var j = 0; j < readLinks.size(); j++) {
+            var ra = readLinks.get(j);
+            pushChap(ra.text() + "", ra.attr("href") + "");
         }
     }
     return list;

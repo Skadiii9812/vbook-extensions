@@ -13,10 +13,8 @@ function execute(url) {
     }
 
     var list = parseChapterList(doc, BASE_URL);
-    if (list.length === 0) {
-        return Response.error("No chapters found");
-    }
-
+    // Last index page can be a short remainder (or empty). Do not abort the
+    // whole TOC after earlier pages already returned chapters.
     Console.log("[TOC] chapters: " + list.length + " ms=" + (Date.now() - t0));
     return Response.success(list);
 }
