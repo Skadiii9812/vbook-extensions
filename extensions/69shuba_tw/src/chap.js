@@ -18,7 +18,7 @@ function execute(url) {
 
     var content = doc.select("#nr1").html() + "";
 
-    if (!content || content.trim().length < 50) {
+    if (!content || content.trim().length === 0) {
         Console.log("[CHAP] empty #nr1 ms=" + (Date.now() - t0));
         return Response.error("Chapter content not found");
     }
